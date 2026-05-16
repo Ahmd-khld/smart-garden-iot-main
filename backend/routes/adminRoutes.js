@@ -1,0 +1,30 @@
+const express = require('express');
+const router = express.Router();
+const { getAdminStats, scanTicket, getUsers, toggleBlockUser, createSubAdmin, deleteUser, resetOccupancy, getAuditLogs, getBannedIPs, unbanIP, getWhitelistedIPs, addWhitelistedIP, removeWhitelistedIP, getMonthlySales, clearAuditLogs, getHardwareAlerts, clearHardwareAlerts, createBackup, getBackups, downloadBackup, deleteBackup, getPromoUsageStats, unlockScanner } = require('../controllers/adminController');
+const { requireAdmin, requireSuperAdmin } = require('../middleware/superAdminMiddleware');
+
+router.get('/stats', requireAdmin, getAdminStats);
+router.post('/scan', requireAdmin, scanTicket);
+router.post('/reset-occupancy', requireSuperAdmin, resetOccupancy);
+router.get('/users', requireAdmin, getUsers);
+router.patch('/users/:id/block', requireAdmin, toggleBlockUser);
+router.delete('/users/:id', requireSuperAdmin, deleteUser);
+router.post('/sub-admin', requireSuperAdmin, createSubAdmin);
+router.get('/audit-logs', requireAdmin, getAuditLogs);
+router.delete('/audit-logs', requireSuperAdmin, clearAuditLogs);
+router.get('/banned-ips', requireAdmin, getBannedIPs);
+router.delete('/banned-ips/:id', requireSuperAdmin, unbanIP);
+router.get('/whitelisted-ips', requireAdmin, getWhitelistedIPs);
+router.post('/whitelisted-ips', requireSuperAdmin, addWhitelistedIP);
+router.delete('/whitelisted-ips/:id', requireSuperAdmin, removeWhitelistedIP);
+router.get('/monthly-sales', requireAdmin, getMonthlySales);
+router.get('/hardware-alerts', requireAdmin, getHardwareAlerts);
+router.delete('/hardware-alerts', requireSuperAdmin, clearHardwareAlerts);
+router.post('/unlock-scanner', requireAdmin, unlockScanner);
+router.post('/backup', requireSuperAdmin, createBackup);
+router.get('/backups', requireAdmin, getBackups);
+router.get('/backups/:filename', requireAdmin, downloadBackup);
+router.delete('/backups/:filename', requireSuperAdmin, deleteBackup);
+router.get('/promo-stats', requireAdmin, getPromoUsageStats);
+
+module.exports = router;
