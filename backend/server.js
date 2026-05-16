@@ -265,11 +265,21 @@ app.use('/api/login', async (req, res, next) => {
       loginStatus.totalFailures += 1;
       
       if (loginStatus.totalFailures >= 50) {
-        BannedIP.create({ ipAddress: clientIp }).then(bannedIp => {
+        BannedIP.create({ ipAddress: clientIp, reason: 'Brute-force login attempts' }).then(bannedIp => {
           const io = req.app.get('io');
           if (io) {
             io.emit('bannedIpAdded', bannedIp);
           }
+          AdminAuditLog.create({
+            email: 'system@smartpark.com',
+            ipAddress: clientIp,
+            status: 'success',
+            statusCode: 429,
+            action: `System auto-banned IP ${clientIp} for brute-force login attempts`,
+            userAgent: req.get('User-Agent') || 'Unknown'
+          }).then(log => {
+            if (io) io.emit('auditLogUpdate', log);
+          }).catch(console.error);
         }).catch(() => {}); // Catch safely ignores if already banned
       } else if (loginStatus.count >= 5) {
         loginStatus.lockoutUntil = new Date(Date.now() + 5 * 60 * 1000); // 5 minute lockout

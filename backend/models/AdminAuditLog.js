@@ -17,6 +17,9 @@ const adminAuditLogSchema = new mongoose.Schema({
     statusCode: {
         type: Number
     },
+    action: {
+        type: String
+    },
     userAgent: {
         type: String
     }
