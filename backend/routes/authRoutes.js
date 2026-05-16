@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 const generateToken = (id) => {
-    return jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret', {
+    return jwt.sign({ id }, process.env.JWT_SECRET || 'secret', {
         expiresIn: '30d',
     });
 };

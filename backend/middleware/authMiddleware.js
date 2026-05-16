@@ -1,25 +1,29 @@
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Middleware to protect routes, checking for a valid session
+// Middleware to protect routes, checking for a valid session via JWT
 const protect = async (req, res, next) => {
-  // We assume the user ID is stored in the session upon login
-  if (req.session && req.session.userId) {
-    try {
-      // Add user from session to request object
-      req.user = await User.findById(req.session.userId).select('-password');
-      if (req.user) {
-        next();
-      } else {
-        res.status(401);
-        return next(new Error('Not authorized, user not found'));
-      }
-    } catch (error) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       res.status(401);
-      return next(new Error('Not authorized, token failed'));
+      return next(new Error('Not authorized, missing or invalid token'));
     }
-  } else {
+    
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+    const user = await User.findById(decoded.id || decoded._id || decoded.userId).select('-password');
+    
+    if (user) {
+      req.user = user;
+      next();
+    } else {
+      res.status(401);
+      return next(new Error('Not authorized, user not found'));
+    }
+  } catch (error) {
     res.status(401);
-    return next(new Error('Not authorized, no session'));
+    return next(new Error('Not authorized, token failed'));
   }
 };
 
