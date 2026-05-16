@@ -33,6 +33,13 @@ router.post('/register', async (req, res) => {
         });
 
         if (user) {
+            const token = generateToken(user._id);
+            res.cookie('token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 30 * 24 * 60 * 60 * 1000
+            });
             res.status(201).json({
                 _id: user._id,
                 name: user.name,
@@ -40,7 +47,7 @@ router.post('/register', async (req, res) => {
                 phone: user.phone,
                 hasDisability: user.hasDisability,
                 role: user.role,
-                token: generateToken(user._id)
+                token
             });
         } else {
             res.status(400).json({ message: 'Invalid user data' });
@@ -64,12 +71,19 @@ router.post('/login', async (req, res) => {
         }
 
         if (await user.matchPassword(password)) {
+            const token = generateToken(user._id);
+            res.cookie('token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 30 * 24 * 60 * 60 * 1000
+            });
             res.json({
                 _id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                token: generateToken(user._id)
+                token
             });
         } else {
             res.status(401).json({ error: 'Invalid credentials' });
