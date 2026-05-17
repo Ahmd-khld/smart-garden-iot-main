@@ -1,31 +1,34 @@
 const mongoose = require('mongoose');
 
-const adminAuditLogSchema = new mongoose.Schema({
+const adminAuditLogSchema = new mongoose.Schema(
+  {
     email: {
-        type: String,
-        required: true
+      type: String,
+      required: true,
     },
     ipAddress: {
-        type: String,
-        required: true
+      type: String,
+      required: true,
     },
     status: {
-        type: String,
-        enum: ['success', 'failed'],
-        required: true
+      type: String,
+      enum: ['success', 'failed'],
+      required: true,
     },
     statusCode: {
-        type: Number
+      type: Number,
     },
     action: {
-        type: String
+      type: String,
     },
     userAgent: {
-        type: String
-    }
-}, {
-    timestamps: true
-});
+      type: String,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
 // Performance Indexes for quick searching
 adminAuditLogSchema.index({ createdAt: -1 });

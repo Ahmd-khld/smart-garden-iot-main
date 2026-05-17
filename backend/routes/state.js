@@ -7,15 +7,15 @@ router.get('/download', async (req, res) => {
   try {
     // 1. Fetch current state from your database (e.g., MongoDB using Mongoose)
     // Example: const settings = await SettingsModel.findOne({});
-    
+
     // Placeholder state (Replace this with actual data from your database)
     const currentState = {
       backupDate: new Date().toISOString(),
       settings: {
         waterThreshold: 30,
-        lightDurationHours: 8
+        lightDurationHours: 8,
       },
-      devices: []
+      devices: [],
     };
 
     res.status(200).json(currentState);
@@ -56,7 +56,7 @@ router.get('/backups', async (req, res) => {
     // Return a list of backups without the full data payload to save bandwidth
     // Sort by date descending so the newest backups appear first
     const backups = await Backup.find({}, '_id date').sort({ date: -1 });
-    const backupList = backups.map(b => ({ id: b._id, date: b.date }));
+    const backupList = backups.map((b) => ({ id: b._id, date: b.date }));
     res.status(200).json(backupList);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch backups' });
@@ -70,11 +70,11 @@ router.post('/backup', async (req, res) => {
     const currentState = {
       waterThreshold: 30,
       lightDurationHours: 8,
-      devices: []
+      devices: [],
     };
 
     const newBackup = new Backup({
-      data: currentState
+      data: currentState,
     });
     await newBackup.save();
 

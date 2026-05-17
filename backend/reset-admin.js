@@ -8,9 +8,9 @@ const resetSuperAdmin = async () => {
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/smart-park');
     console.log('MongoDB Connected.');
 
-    const email = 'admin@smartpark.com';
-    // Use the password passed in the terminal, or fallback to 'admin'
-    const password = process.argv[2] || 'admin';
+    const email = process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com';
+    // Use the password passed in the terminal, or fallback to the env variable/default
+    const password = process.argv[2] || process.env.ADMIN_PASSWORD || 'admin';
     const hashedPassword = await bcrypt.hash(password, 12);
 
     const adminUser = await User.findOne({ email });
@@ -26,7 +26,7 @@ const resetSuperAdmin = async () => {
         password: hashedPassword,
         age: 30,
         role: 'admin',
-        hasDisability: false
+        hasDisability: false,
       });
       console.log(`SUCCESS: Super admin ${email} created with password: "${password}"`);
     }

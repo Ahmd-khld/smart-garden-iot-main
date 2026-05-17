@@ -1,26 +1,29 @@
 const mongoose = require('mongoose');
 
-const whitelistedIPSchema = new mongoose.Schema({
+const whitelistedIPSchema = new mongoose.Schema(
+  {
     ipAddress: {
-        type: String,
-        required: true,
-        unique: true,
-        index: true
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
     },
     macAddress: {
-        type: String,
-        default: ''
+      type: String,
+      default: '',
     },
     adminEmail: {
-        type: String,
-        default: ''
+      type: String,
+      default: '',
     },
     description: {
-        type: String,
-        default: 'Added via Admin Dashboard'
-    }
-}, {
-    timestamps: true
-});
+      type: String,
+      default: 'Added via Admin Dashboard',
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
 module.exports = mongoose.model('WhitelistedIP', whitelistedIPSchema);

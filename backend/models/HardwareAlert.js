@@ -1,22 +1,25 @@
 const mongoose = require('mongoose');
 
-const hardwareAlertSchema = new mongoose.Schema({
+const hardwareAlertSchema = new mongoose.Schema(
+  {
     message: {
-        type: String,
-        required: true
+      type: String,
+      required: true,
     },
     type: {
-        type: String,
-        enum: ['info', 'warning', 'action', 'success', 'error'],
-        required: true
+      type: String,
+      enum: ['info', 'warning', 'action', 'success', 'error'],
+      required: true,
     },
     timeString: {
-        type: String,
-        required: true
-    }
-}, {
-    timestamps: true
-});
+      type: String,
+      required: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
 // Performance Indexes for rapid sorting and filtering
 hardwareAlertSchema.index({ createdAt: -1 });

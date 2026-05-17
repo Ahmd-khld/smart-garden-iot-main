@@ -1,27 +1,26 @@
 const mongoose = require('mongoose');
 
-const promoCodeSchema = new mongoose.Schema({
+const promoCodeSchema = new mongoose.Schema(
+  {
     code: {
-        type: String,
-        unique: true,
-        required: true
+      type: String,
+      unique: true,
+      required: true,
     },
     discount: {
-        type: Number,
-        default: 10
+      type: Number,
+      default: 10,
     },
     userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
     },
-    isUsed: {
-        type: Boolean,
-        default: false
-    }
-}, {
-    timestamps: true
-});
+  },
+  {
+    timestamps: true,
+  }
+);
 
 const PromoCode = mongoose.model('PromoCode', promoCodeSchema);
 module.exports = PromoCode;

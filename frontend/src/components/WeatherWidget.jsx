@@ -2,80 +2,95 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 
 const WeatherWidget = () => {
-    const [weather, setWeather] = useState(null);
-    const [hasError, setHasError] = useState(false);
+  const [weather, setWeather] = useState(null);
+  const [hasError, setHasError] = useState(false);
 
-    useEffect(() => {
-        const fetchWeather = async () => {
-            try {
-                const response = await fetch('https://api.open-meteo.com/v1/forecast?latitude=30.0444&longitude=31.2357&daily=temperature_2m_max&current_weather=true&timezone=Africa%2FCairo');
-                if (!response.ok) throw new Error('Weather API failed');
-                const data = await response.json();
+  useEffect(() => {
+    const fetchWeather = async () => {
+      try {
+        const response = await fetch(
+          'https://api.open-meteo.com/v1/forecast?latitude=30.0444&longitude=31.2357&daily=temperature_2m_max&current_weather=true&timezone=Africa%2FCairo'
+        );
+        if (!response.ok) throw new Error('Weather API failed');
+        const data = await response.json();
 
-                setWeather({
-                    currentTemp: data.current_weather.temperature,
-                    forecast: data.daily.time.slice(0, 3).map((time, index) => ({
-                        date: time,
-                        maxTemp: data.daily.temperature_2m_max[index]
-                    }))
-                });
-            } catch (err) {
-                console.error('Weather fetch error:', err);
-                setHasError(true);
-            }
-        };
-
-        fetchWeather();
-    }, []);
-
-    if (hasError || !weather) return null;
-
-    const getDayName = (dateStr) => {
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+        setWeather({
+          currentTemp: data.current_weather.temperature,
+          forecast: data.daily.time.slice(0, 3).map((time, index) => ({
+            date: time,
+            maxTemp: data.daily.temperature_2m_max[index],
+          })),
+        });
+      } catch (err) {
+        console.error('Weather fetch error:', err);
+        setHasError(true);
+      }
     };
 
-    return (
-        <StyledWrapper>
-            <div className="card sunny">
-                <div className="sky">
-                    <div className="sun-container">
-                        <div className="sun-glow" />
-                        <div className="sun-core" />
-                    </div>
-                    <svg className="landscape" viewBox="0 0 100 100" preserveAspectRatio="none">
-                        <path d="M0 80 L15 72 L30 78 L50 65 L75 75 L100 62 V100 H0 Z" fill="#4d6d3d" />
-                        <path d="M0 90 L25 84 L50 92 L80 86 L100 92 V100 H0 Z" fill="#6a994e" />
-                    </svg>
-                </div>
-                <div className="content">
-                    <div className="main-temp">
-                        <div style={{ fontSize: '3.5rem', fontWeight: 'bold', textShadow: '4px 4px 0px rgba(0,0,0,0.15)' }}>
-                            {Math.round(weather.currentTemp)}°
-                        </div>
-                    </div>
-                    <div className="current-status">
-                        <svg className="icon-weather" viewBox="0 0 20 20">
-                            <path d="M9 2 h2 v2 h-2 z M9 16 h2 v2 h-2 z M2 9 h2 v2 h-2 z M16 9 h2 v2 h-2 z" fill="white" />
-                            <path d="M7 7 h6 v6 h-6 z" fill="white" />
-                            <path d="M4 4 h2 v2 h-2 z M14 4 h2 v2 h-2 z M4 14 h2 v2 h-2 z M14 14 h2 v2 h-2 z" fill="white" opacity="0.6" />
-                        </svg>
-                        <span>Sunny Day</span>
-                    </div>
-                    <div className="forecast">
-                        {weather.forecast.map((day, index) => (
-                            <div key={day.date} className={`day-col ${index === 0 ? 'active' : ''}`}>
-                                <span className="day-label">{getDayName(day.date)}</span>
-                                <span className="day-val">{Math.round(day.maxTemp)}°</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                <div className="scanlines" />
+    fetchWeather();
+  }, []);
+
+  if (hasError || !weather) return null;
+
+  const getDayName = (dateStr) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+  };
+
+  return (
+    <StyledWrapper>
+      <div className="card sunny">
+        <div className="sky">
+          <div className="sun-container">
+            <div className="sun-glow" />
+            <div className="sun-core" />
+          </div>
+          <svg className="landscape" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <path d="M0 80 L15 72 L30 78 L50 65 L75 75 L100 62 V100 H0 Z" fill="#4d6d3d" />
+            <path d="M0 90 L25 84 L50 92 L80 86 L100 92 V100 H0 Z" fill="#6a994e" />
+          </svg>
+        </div>
+        <div className="content">
+          <div className="main-temp">
+            <div
+              style={{
+                fontSize: '3.5rem',
+                fontWeight: 'bold',
+                textShadow: '4px 4px 0px rgba(0,0,0,0.15)',
+              }}
+            >
+              {Math.round(weather.currentTemp)}°
             </div>
-        </StyledWrapper>
-    );
-}
+          </div>
+          <div className="current-status">
+            <svg className="icon-weather" viewBox="0 0 20 20">
+              <path
+                d="M9 2 h2 v2 h-2 z M9 16 h2 v2 h-2 z M2 9 h2 v2 h-2 z M16 9 h2 v2 h-2 z"
+                fill="white"
+              />
+              <path d="M7 7 h6 v6 h-6 z" fill="white" />
+              <path
+                d="M4 4 h2 v2 h-2 z M14 4 h2 v2 h-2 z M4 14 h2 v2 h-2 z M14 14 h2 v2 h-2 z"
+                fill="white"
+                opacity="0.6"
+              />
+            </svg>
+            <span>Sunny Day</span>
+          </div>
+          <div className="forecast">
+            {weather.forecast.map((day, index) => (
+              <div key={day.date} className={`day-col ${index === 0 ? 'active' : ''}`}>
+                <span className="day-label">{getDayName(day.date)}</span>
+                <span className="day-val">{Math.round(day.maxTemp)}°</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="scanlines" />
+      </div>
+    </StyledWrapper>
+  );
+};
 
 const StyledWrapper = styled.div`
   .card.sunny {
@@ -85,7 +100,7 @@ const StyledWrapper = styled.div`
     border-radius: 36px;
     position: relative;
     overflow: hidden;
-    font-family: "Courier New", Courier, monospace;
+    font-family: 'Courier New', Courier, monospace;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     user-select: none;
@@ -125,11 +140,7 @@ const StyledWrapper = styled.div`
   .sun-glow {
     position: absolute;
     inset: -15px;
-    background: radial-gradient(
-      circle,
-      rgba(255, 255, 255, 0.4) 0%,
-      transparent 70%
-    );
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, transparent 70%);
     animation: sunPulse 3s ease-in-out infinite;
   }
 
@@ -232,14 +243,11 @@ const StyledWrapper = styled.div`
   .scanlines {
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-      to bottom,
-      transparent 50%,
-      rgba(0, 0, 0, 0.04) 50%
-    );
+    background: linear-gradient(to bottom, transparent 50%, rgba(0, 0, 0, 0.04) 50%);
     background-size: 100% 4px;
     pointer-events: none;
     z-index: 20;
-  }`;
+  }
+`;
 
 export default WeatherWidget;

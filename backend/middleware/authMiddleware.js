@@ -9,11 +9,13 @@ const protect = async (req, res, next) => {
       res.status(401);
       return next(new Error('Not authorized, missing or invalid token'));
     }
-    
+
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-    const user = await User.findById(decoded.id || decoded._id || decoded.userId).select('-password');
-    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id || decoded._id || decoded.userId).select(
+      '-password'
+    );
+
     if (user) {
       req.user = user;
       next();

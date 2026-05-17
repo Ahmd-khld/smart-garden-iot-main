@@ -19,7 +19,7 @@ const MonkeyForm = ({
   setIsLogin,
   isLoading,
   error,
-  setShowForgotModal
+  setShowForgotModal,
 }) => {
   return (
     <StyledWrapper>
@@ -41,7 +41,9 @@ const MonkeyForm = ({
           {!isLogin && (
             <div className="w-full space-y-3 mb-2 text-left">
               <div>
-                <label className="label_input" htmlFor="name-input">Full Name</label>
+                <label className="label_input" htmlFor="name-input">
+                  Full Name
+                </label>
                 <input
                   className="input"
                   type="text"
@@ -54,7 +56,9 @@ const MonkeyForm = ({
               </div>
               <div className="flex space-x-3 text-left">
                 <div className="flex-1">
-                  <label className="label_input" htmlFor="age-input">Age</label>
+                  <label className="label_input" htmlFor="age-input">
+                    Age
+                  </label>
                   <input
                     className="input"
                     type="number"
@@ -67,7 +71,9 @@ const MonkeyForm = ({
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="label_input" htmlFor="phone-input">Phone</label>
+                  <label className="label_input" htmlFor="phone-input">
+                    Phone
+                  </label>
                   <input
                     className="input"
                     type="tel"
@@ -87,14 +93,19 @@ const MonkeyForm = ({
                   onChange={(e) => setHasDisability(e.target.checked)}
                   className="w-4 h-4 text-[#80C241] border-[#80C241] rounded focus:ring-[#80C241] cursor-pointer"
                 />
-                <label htmlFor="hasDisability-monkey" className="ml-2 block text-[10px] font-bold text-[#0B4228] dark:text-[#e2e8f0] cursor-pointer select-none">
+                <label
+                  htmlFor="hasDisability-monkey"
+                  className="ml-2 block text-[10px] font-bold text-[#0B4228] dark:text-[#e2e8f0] cursor-pointer select-none"
+                >
                   I require accessibility features
                 </label>
               </div>
             </div>
           )}
 
-          <label className="label_input" htmlFor="email-input">Email</label>
+          <label className="label_input" htmlFor="email-input">
+            Email
+          </label>
           <input
             spellCheck="false"
             className="input"
@@ -107,7 +118,9 @@ const MonkeyForm = ({
           />
 
           <div className="frg_pss">
-            <label className="label_input" htmlFor="password-input">Password</label>
+            <label className="label_input" htmlFor="password-input">
+              Password
+            </label>
             {isLogin && setShowForgotModal && (
               <button
                 type="button"
@@ -130,19 +143,19 @@ const MonkeyForm = ({
           />
 
           <button className="submit" type="submit" disabled={isLoading}>
-            {isLoading ? 'Processing...' : (isLogin ? 'Login' : 'Register')}
+            {isLoading ? 'Processing...' : isLogin ? 'Login' : 'Register'}
           </button>
 
-          {(isLogin !== undefined) && (
+          {isLogin !== undefined && (
             <div className="mt-4 text-center">
               <p className="text-[11px] text-gray-500 font-medium">
-                {isLogin ? "Don't have an account?" : "Already have an account?"}
+                {isLogin ? "Don't have an account?" : 'Already have an account?'}
                 <button
                   type="button"
                   onClick={() => setIsLogin(!isLogin)}
                   className="ml-2 text-smart-light font-bold hover:underline bg-transparent border-none cursor-pointer"
                 >
-                  {isLogin ? "Register here" : "Sign in here"}
+                  {isLogin ? 'Register here' : 'Sign in here'}
                 </button>
               </p>
             </div>
@@ -150,7 +163,13 @@ const MonkeyForm = ({
         </form>
 
         <label htmlFor="blind-input" className="avatar">
-          <svg xmlns="http://www.w3.org/2000/svg" width={35} height={35} viewBox="0 0 64 64" id="monkey">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width={35}
+            height={35}
+            viewBox="0 0 64 64"
+            id="monkey"
+          >
             <ellipse cx="53.7" cy={33} rx="8.3" ry="8.2" fill="#89664c" />
             <ellipse cx="53.7" cy={33} rx="5.4" ry="5.4" fill="#ffc5d3" />
             <ellipse cx="10.2" cy={33} rx="8.2" ry="8.2" fill="#89664c" />
@@ -159,7 +178,10 @@ const MonkeyForm = ({
               <path d="m43.4 10.8c1.1-.6 1.9-.9 1.9-.9-3.2-1.1-6-1.8-8.5-2.1 1.3-1 2.1-1.3 2.1-1.3-20.4-2.9-30.1 9-30.1 19.5h46.4c-.7-7.4-4.8-12.4-11.8-15.2" />
               <path d="m55.3 27.6c0-9.7-10.4-17.6-23.3-17.6s-23.3 7.9-23.3 17.6c0 2.3.6 4.4 1.6 6.4-1 2-1.6 4.2-1.6 6.4 0 9.7 10.4 17.6 23.3 17.6s23.3-7.9 23.3-17.6c0-2.3-.6-4.4-1.6-6.4 1-2 1.6-4.2 1.6-6.4" />
             </g>
-            <path d="m52 28.2c0-16.9-20-6.1-20-6.1s-20-10.8-20 6.1c0 4.7 2.9 9 7.5 11.7-1.3 1.7-2.1 3.6-2.1 5.7 0 6.1 6.6 11 14.7 11s14.7-4.9 14.7-11c0-2.1-.8-4-2.1-5.7 4.4-2.7 7.3-7 7.3-11.7" fill="#e0ac7e" />
+            <path
+              d="m52 28.2c0-16.9-20-6.1-20-6.1s-20-10.8-20 6.1c0 4.7 2.9 9 7.5 11.7-1.3 1.7-2.1 3.6-2.1 5.7 0 6.1 6.6 11 14.7 11s14.7-4.9 14.7-11c0-2.1-.8-4-2.1-5.7 4.4-2.7 7.3-7 7.3-11.7"
+              fill="#e0ac7e"
+            />
             <g fill="#3b302a" className="monkey-eye-nose">
               <path d="m35.1 38.7c0 1.1-.4 2.1-1 2.1-.6 0-1-.9-1-2.1 0-1.1.4-2.1 1-2.1.6.1 1 1 1 2.1" />
               <path d="m30.9 38.7c0 1.1-.4 2.1-1 2.1-.6 0-1-.9-1-2.1 0-1.1.4-2.1 1-2.1.5.1 1 1 1 2.1" />
@@ -167,19 +189,31 @@ const MonkeyForm = ({
               <ellipse cx="23.3" cy="31.7" rx="3.5" ry="4.5" className="monkey-eye-l" />
             </g>
           </svg>
-          <svg xmlns="http://www.w3.org/2000/svg" width={35} height={35} viewBox="0 0 64 64" id="monkey-hands">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width={35}
+            height={35}
+            viewBox="0 0 64 64"
+            id="monkey-hands"
+          >
             <path fill="#89664C" d="M9.4,32.5L2.1,61.9H14c-1.6-7.7,4-21,4-21L9.4,32.5z" />
-            <path fill="#FFD6BB" d="M15.8,24.8c0,0,4.9-4.5,9.5-3.9c2.3,0.3-7.1,7.6-7.1,7.6s9.7-8.2,11.7-5.6c1.8,2.3-8.9,9.8-8.9,9.8
-      	s10-8.1,9.6-4.6c-0.3,3.8-7.9,12.8-12.5,13.8C11.5,43.2,6.3,39,9.8,24.4C11.6,17,13.3,25.2,15.8,24.8" />
+            <path
+              fill="#FFD6BB"
+              d="M15.8,24.8c0,0,4.9-4.5,9.5-3.9c2.3,0.3-7.1,7.6-7.1,7.6s9.7-8.2,11.7-5.6c1.8,2.3-8.9,9.8-8.9,9.8
+      	s10-8.1,9.6-4.6c-0.3,3.8-7.9,12.8-12.5,13.8C11.5,43.2,6.3,39,9.8,24.4C11.6,17,13.3,25.2,15.8,24.8"
+            />
             <path fill="#89664C" d="M54.8,32.5l7.3,29.4H50.2c1.6-7.7-4-21-4-21L54.8,32.5z" />
-            <path fill="#FFD6BB" d="M48.4,24.8c0,0-4.9-4.5-9.5-3.9c-2.3,0.3,7.1,7.6,7.1,7.6s-9.7-8.2-11.7-5.6c-1.8,2.3,8.9,9.8,8.9,9.8
-      	s-10-8.1-9.7-4.6c0.4,3.8,8,12.8,12.6,13.8c6.6,1.3,11.8-2.9,8.3-17.5C52.6,17,50.9,25.2,48.4,24.8" />
+            <path
+              fill="#FFD6BB"
+              d="M48.4,24.8c0,0-4.9-4.5-9.5-3.9c-2.3,0.3,7.1,7.6,7.1,7.6s-9.7-8.2-11.7-5.6c-1.8,2.3,8.9,9.8,8.9,9.8
+      	s-10-8.1-9.7-4.6c0.4,3.8,8,12.8,12.6,13.8c6.6,1.3,11.8-2.9,8.3-17.5C52.6,17,50.9,25.2,48.4,24.8"
+            />
           </svg>
         </label>
       </div>
     </StyledWrapper>
   );
-}
+};
 
 const StyledWrapper = styled.div`
   .card {
@@ -203,8 +237,8 @@ const StyledWrapper = styled.div`
     flex-direction: column;
     overflow: visible;
     padding: var(--p);
-    font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande",
-      "Lucida Sans", Arial, sans-serif;
+    font-family:
+      'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
   }
 
   .avatar {
@@ -249,7 +283,7 @@ const StyledWrapper = styled.div`
   }
 
   .avatar::before {
-    content: "";
+    content: '';
     border-radius: 45%;
     width: calc(var(--sz-svg) / 3.889);
     height: calc(var(--sz-svg) / 5.833);
@@ -322,16 +356,8 @@ const StyledWrapper = styled.div`
   }
   .form:focus-within ~ .avatar::before,
   .form:focus-within ~ .avatar svg#monkey .monkey-eye-nose,
-  .blind-check:not(:checked)
-    ~ .form:focus-within
-    ~ .avatar
-    svg#monkey
-    .monkey-eye-r,
-  .blind-check:not(:checked)
-    ~ .form:focus-within
-    ~ .avatar
-    svg#monkey
-    .monkey-eye-l {
+  .blind-check:not(:checked) ~ .form:focus-within ~ .avatar svg#monkey .monkey-eye-r,
+  .blind-check:not(:checked) ~ .form:focus-within ~ .avatar svg#monkey .monkey-eye-l {
     ry: 3;
     cy: 35;
     animation: slick 3s ease infinite 1s;
@@ -371,7 +397,7 @@ const StyledWrapper = styled.div`
     justify-content: center;
   }
   .card label.blind_input:before {
-    content: "";
+    content: '';
     position: absolute;
     left: calc((var(--input-px) / 2) * -1);
     top: 0;
@@ -410,8 +436,8 @@ const StyledWrapper = styled.div`
     margin-bottom: 1.5rem;
     padding-top: 0;
     padding-bottom: 1rem;
-    color: #0B4228;
-    border-bottom: 2px solid #80C241;
+    color: #0b4228;
+    border-bottom: 2px solid #80c241;
     font-style: italic;
   }
 
@@ -419,7 +445,7 @@ const StyledWrapper = styled.div`
     white-space: nowrap;
     font-size: 0.85rem;
     margin-top: calc(var(--space-y) / 2);
-    color: #0B4228;
+    color: #0b4228;
     font-weight: 800;
     display: inline;
     text-align: left;
@@ -434,14 +460,14 @@ const StyledWrapper = styled.div`
 
   .form .input {
     resize: vertical;
-    background: #F4FBF2;
-    border: 1px solid #80C241;
+    background: #f4fbf2;
+    border: 1px solid #80c241;
     border-radius: 12px;
     outline: none;
     padding: var(--input-py) var(--input-px);
     font-size: 16px;
     width: 100%;
-    color: #0B4228;
+    color: #0b4228;
     margin: var(--space-y) 0;
     transition: all 0.25s ease;
   }
@@ -449,7 +475,7 @@ const StyledWrapper = styled.div`
     padding-right: calc(var(--blind-w) + var(--input-px) + 4px);
   }
   .form .input:focus {
-    border: 2px solid #80C241;
+    border: 2px solid #80c241;
     outline: 0;
     box-shadow: 0 0 0 4px rgba(128, 194, 65, 0.2);
   }
@@ -458,13 +484,13 @@ const StyledWrapper = styled.div`
     display: inline-flex;
     align-items: center;
   }
-  
+
   .form .submit {
     height: var(--submit-h);
     width: 100%;
     outline: none;
     cursor: pointer;
-    background-color: #80C241;
+    background-color: #80c241;
     border: none;
     font-weight: 800;
     letter-spacing: 1px;
@@ -485,11 +511,11 @@ const StyledWrapper = styled.div`
     box-shadow: 0 4px 14px rgba(128, 194, 65, 0.4);
   }
   .form .submit:hover {
-    background-color: #0B4228;
+    background-color: #0b4228;
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(11, 66, 40, 0.3);
   }
-  
+
   .form .submit:active {
     transform: translateY(0);
   }
@@ -528,58 +554,58 @@ const StyledWrapper = styled.div`
     color: #80c241; /* Smart Light Green */
   }
   html.dark .form .frg_pss a:hover {
-    color: #B2FF4A; /* Smart Glow */
-  } 
+    color: #b2ff4a; /* Smart Glow */
+  }
   /* --- DARK MODE OVERRIDES --- */
   .dark & .card,
   html.dark & .card,
   body.dark & .card {
     background-color: #1e293b; /* Matches your dark info cards */
   }
-  
+
   .dark & .form .title,
   html.dark & .form .title {
     color: #f8faf8;
     border-bottom: 2px solid rgba(255, 255, 255, 0.2);
   }
-  
+
   .dark & .form .label_input,
   html.dark & .form .label_input {
     color: #e2e8f0;
   }
-  
+
   .dark & .form .input,
   html.dark & .form .input {
     background-color: #334155;
     color: #f8faf8;
     border: 1px solid #475569;
   }
-  
+
   .dark & .card label.blind_input,
   html.dark & .card label.blind_input {
     background-color: #334155;
     color: #cbd5e1;
   }
-  
+
   .dark & .card label.blind_input:before,
   html.dark & .card label.blind_input:before {
     background: #475569;
   }
-  
+
   .dark & .card label.blind_input:hover,
   html.dark & .card label.blind_input:hover {
     background-color: #475569;
     color: #ffffff;
   }
-  
+
   .dark & .form .frg_pss a,
   html.dark & .form .frg_pss a {
     color: #80c241; /* Smart Light Green */
   }
-  
+
   .dark & .form .frg_pss a:hover,
   html.dark & .form .frg_pss a:hover {
-    color: #B2FF4A; /* Smart Glow */
+    color: #b2ff4a; /* Smart Glow */
   }
 `;
 

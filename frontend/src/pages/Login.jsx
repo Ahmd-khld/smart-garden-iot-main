@@ -24,14 +24,18 @@ const Login = () => {
       if (data.role === 'admin') {
         localStorage.setItem('adminEmail', email.toLowerCase().trim());
       }
-      
+
       if (data.role === 'admin') {
-          navigate('/admin/dashboard');
+        navigate('/admin/dashboard');
       } else {
-          navigate('/book');
+        navigate('/book');
       }
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.error || `Server connection failed: ${err.message}`);
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.error ||
+          `Server connection failed: ${err.message}`
+      );
     } finally {
       setIsLoading(false);
     }
@@ -39,18 +43,18 @@ const Login = () => {
 
   return (
     <div className="flex-grow flex items-center justify-center p-6 bg-smart-bg dark:bg-black transition-colors duration-500 min-h-[calc(100vh-6rem)]">
-        <MonkeyForm 
-            email={email} 
-            setEmail={setEmail} 
-            password={password} 
-            setPassword={setPassword} 
-            onLogin={handleLogin}
-            isLogin={true}
-            isLoading={isLoading}
-            error={error}
-        />
+      <MonkeyForm
+        email={email}
+        setEmail={setEmail}
+        password={password}
+        setPassword={setPassword}
+        onLogin={handleLogin}
+        isLogin={true}
+        isLoading={isLoading}
+        error={error}
+      />
     </div>
   );
-}
+};
 
 export default Login;

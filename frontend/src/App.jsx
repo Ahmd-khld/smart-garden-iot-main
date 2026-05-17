@@ -7,6 +7,7 @@ import Payment from './pages/Payment';
 import About from './pages/About';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminHardwareAlerts from './pages/AdminHardwareAlerts';
+import AdminUserTickets from './pages/AdminUserTickets';
 import Profile from './pages/Profile';
 import ParkMap from './pages/ParkMap';
 import ResetPassword from './pages/ResetPassword';
@@ -15,7 +16,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import GamePage from './pages/GamePage';
 import { Navigate } from 'react-router-dom';
 
-// Safe local storage utility to prevent complete app crashes when 
+// Safe local storage utility to prevent complete app crashes when
 // the browser restricts cookies/local storage (e.g. Incognito mode)
 const getSafeStorage = (key) => {
   try {
@@ -74,37 +75,45 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
-            <Route 
-              path="/admin/dashboard" 
+            <Route
+              path="/admin/dashboard"
               element={
                 <AdminRoute>
                   <AdminDashboard />
                 </AdminRoute>
-              } 
+              }
             />
-            <Route 
-              path="/admin/alerts" 
+            <Route
+              path="/admin/alerts"
               element={
                 <AdminRoute>
                   <AdminHardwareAlerts />
                 </AdminRoute>
-              } 
+              }
             />
-            <Route 
-              path="/profile" 
+            <Route
+              path="/admin/users/:userId/tickets"
+              element={
+                <AdminRoute>
+                  <AdminUserTickets />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/profile"
               element={
                 <PrivateRoute>
                   <Profile />
                 </PrivateRoute>
-              } 
+              }
             />
-            <Route 
-              path="/rewards" 
+            <Route
+              path="/rewards"
               element={
                 <PrivateRoute>
                   <GamePage />
                 </PrivateRoute>
-              } 
+              }
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

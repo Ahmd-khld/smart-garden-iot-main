@@ -1,12 +1,42 @@
 const express = require('express');
 const router = express.Router();
-const { getAdminStats, scanTicket, getUsers, toggleBlockUser, createSubAdmin, deleteUser, resetOccupancy, getAuditLogs, getBannedIPs, unbanIP, getWhitelistedIPs, addWhitelistedIP, removeWhitelistedIP, getMonthlySales, clearAuditLogs, getHardwareAlerts, clearHardwareAlerts, createBackup, getBackups, downloadBackup, deleteBackup, getPromoUsageStats, unlockScanner } = require('../controllers/adminController');
+const {
+  getAdminStats,
+  scanTicket,
+  getUsers,
+  toggleBlockUser,
+  createSubAdmin,
+  deleteUser,
+  resetOccupancy,
+  getAuditLogs,
+  getBannedIPs,
+  unbanIP,
+  getWhitelistedIPs,
+  addWhitelistedIP,
+  removeWhitelistedIP,
+  getMonthlySales,
+  clearAuditLogs,
+  getHardwareAlerts,
+  clearHardwareAlerts,
+  createBackup,
+  getBackups,
+  downloadBackup,
+  deleteBackup,
+  unlockScanner,
+  getUserTickets,
+  scanUserTicket,
+  generateMockData,
+} = require('../controllers/adminController');
+const { protect } = require('../middleware/authMiddleware');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/superAdminMiddleware');
 
 router.get('/stats', requireAdmin, getAdminStats);
 router.post('/scan', requireAdmin, scanTicket);
 router.post('/reset-occupancy', requireSuperAdmin, resetOccupancy);
+router.post('/generate-mock-data', protect, requireSuperAdmin, generateMockData);
 router.get('/users', requireAdmin, getUsers);
+router.get('/users/:userId/tickets', requireAdmin, getUserTickets);
+router.post('/users/:userId/tickets/:ticketId/scan', requireAdmin, scanUserTicket);
 router.patch('/users/:id/block', requireAdmin, toggleBlockUser);
 router.delete('/users/:id', requireSuperAdmin, deleteUser);
 router.post('/sub-admin', requireSuperAdmin, createSubAdmin);
@@ -25,6 +55,5 @@ router.post('/backup', requireSuperAdmin, createBackup);
 router.get('/backups', requireAdmin, getBackups);
 router.get('/backups/:filename', requireAdmin, downloadBackup);
 router.delete('/backups/:filename', requireSuperAdmin, deleteBackup);
-router.get('/promo-stats', requireAdmin, getPromoUsageStats);
 
 module.exports = router;
