@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import api from '../api';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -12,21 +13,15 @@ const ForgotPassword = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await fetch('http://localhost:5000/api/users/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
-      });
+      const response = await api.post('/users/forgot-password', { email });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (response.status === 200) {
         setMessage({ type: 'success', text: 'Password reset link sent! Please check your email.' });
       } else {
-        setMessage({ type: 'error', text: data.message || 'Something went wrong. Please try again.' });
+        setMessage({ type: 'error', text: response.data?.message || 'Something went wrong. Please try again.' });
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'Server connection failed. Please try again later.' });
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Server connection failed. Please try again later.' });
     } finally {
       setIsLoading(false);
     }

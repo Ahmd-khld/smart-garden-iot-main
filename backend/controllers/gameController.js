@@ -64,6 +64,11 @@ const handleGameWin = async (req, res) => {
         });
         await newPromo.save();
 
+        const io = req.app.get('io');
+        if (io) {
+            io.emit('promoStatsUpdate');
+        }
+
         res.json({
             code,
             message: 'Congratulations! You won a promo code.',

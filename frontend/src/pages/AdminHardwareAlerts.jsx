@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { socket } from '../socket';
 import AdminHeader from '../components/AdminHeader';
+import api from '../api';
 
 // Helper function to decode JWT and check for expiration
 const isTokenExpired = (token) => {
@@ -61,27 +62,28 @@ const AdminHardwareAlerts = () => {
       if (!silent) setLoading(true);
       
       try {
-        let url = `http://localhost:5000/api/admin/hardware-alerts?page=${pageNum}&limit=50`;
-        if (filterDate) url += `&date=${filterDate}`;
-        if (filterType !== 'all') url += `&type=${filterType}`;
+        const params = {
+            page: pageNum,
+            limit: 50
+        };
+        if (filterDate) params.date = filterDate;
+        if (filterType !== 'all') params.type = filterType;
         
-        const response = await fetch(url, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          // Fallback to raw array if backend hasn't been updated to pagination yet
-          setAlerts(data.alerts || (Array.isArray(data) ? data : []));
-          setTotalPages(data.totalPages || 1);
-          setTotalAlertsCount(data.totalAlerts || 0);
-        } else if (response.status === 401) {
+        const response = await api.get('/admin/hardware-alerts', { params });
+        const data = response.data;
+        
+        // Fallback to raw array if backend hasn't been updated to pagination yet
+        setAlerts(data.alerts || (Array.isArray(data) ? data : []));
+        setTotalPages(data.totalPages || 1);
+        setTotalAlertsCount(data.totalAlerts || 0);
+      } catch (error) {
+        console.error('Error fetching alerts:', error);
+        if (error.response?.status === 401) {
           console.error('Unauthorized: Invalid or expired token. Logging out.');
           localStorage.removeItem('token');
           localStorage.removeItem('adminEmail');
           navigate('/');
         }
-      } catch (error) {
-        console.error('Error fetching alerts:', error);
       } finally {
         if (!silent) setLoading(false);
       }
@@ -94,8 +96,12 @@ const AdminHardwareAlerts = () => {
 
   // Connect to real-time WebSockets
   useEffect(() => {
-    if (!socket.connected) {
-      socket.connect();
+    const token = localStorage.getItem('token');
+    if (token) {
+        socket.auth = { token };
+        if (!socket.connected) {
+          socket.connect();
+        }
     }
     
     const onHardwareAlert = (newAlert) => {
@@ -119,27 +125,20 @@ const AdminHardwareAlerts = () => {
     };
 
     const onHardwareAlertsCleared = async (data) => {
+      console.log('🧹 Received Hardware Alerts Cleared signal');
       if (data && data.partial) {
-        const token = localStorage.getItem('token');
-        if (token) {
           try {
-            const res = await fetch(
-              'http://localhost:5000/api/admin/hardware-alerts?page=1&limit=10',
-              {
-                headers: { Authorization: `Bearer ${token}` },
-              }
-            );
-            if (res.ok) {
-              const json = await res.json();
-              setAlerts(json.alerts || (Array.isArray(json) ? json : []));
-              setPage(1);
-              setTotalPages(json.totalPages || 1);
-              setTotalAlertsCount(json.totalAlerts || 0);
-            }
+            const res = await api.get('/admin/hardware-alerts', {
+                params: { page: 1, limit: 10 }
+            });
+            const json = res.data;
+            setAlerts(json.alerts || (Array.isArray(json) ? json : []));
+            setPage(1);
+            setTotalPages(json.totalPages || 1);
+            setTotalAlertsCount(json.totalAlerts || 0);
           } catch (err) {
             console.error('Failed to refetch after partial clear', err);
           }
-        }
       } else {
         setAlerts([]);
         setTotalPages(1);
@@ -148,15 +147,22 @@ const AdminHardwareAlerts = () => {
       }
     };
 
+    const onDataRefresh = () => {
+        console.log('🔄 Hardware Alerts: Received Global Data Refresh Signal');
+        fetchAlerts(page, true);
+    };
+
     socket.on('hardwareAlert', onHardwareAlert);
     socket.on('auditLogUpdate', onAuditLogUpdate);
     socket.on('hardwareAlertsCleared', onHardwareAlertsCleared);
+    socket.on('dataRefresh', onDataRefresh);
 
     return () => {
       // Only remove the listeners for this component, do not disconnect the socket
       socket.off('hardwareAlert', onHardwareAlert);
       socket.off('auditLogUpdate', onAuditLogUpdate);
       socket.off('hardwareAlertsCleared', onHardwareAlertsCleared);
+      socket.off('dataRefresh', onDataRefresh);
     };
   }, []);
 
@@ -167,22 +173,17 @@ const AdminHardwareAlerts = () => {
     
     if (!window.confirm(confirmMsg)) return;
 
-    const token = localStorage.getItem('token');
-    let url = 'http://localhost:5000/api/admin/hardware-alerts';
-    if (olderThan) url += `?olderThan=${olderThan}`;
-    
     try {
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        alert(data.message || 'Failed to clear alerts');
+      const params = {};
+      if (olderThan) params.olderThan = olderThan;
+      
+      const response = await api.delete('/admin/hardware-alerts', { params });
+      if (response.status !== 200) {
+        alert(response.data?.message || 'Failed to clear alerts');
       }
     } catch (error) {
       console.error('Failed to clear alerts', error);
-      alert('Network error while clearing alerts.');
+      alert(error.response?.data?.message || 'Network error while clearing alerts.');
     }
   };
 

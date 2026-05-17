@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WeatherWidget from '../components/WeatherWidget';
+import api from '../api';
 
 const pricingTiers = {
   'one-time': { child: 100, adult: 200, senior: 150 },
@@ -60,13 +61,11 @@ const BookingPage = () => {
     try {
       const token = localStorage.getItem('token');
       const dateStr = insightStartDate.toISOString().split('T')[0];
-      const response = await fetch(`http://localhost:5000/api/tickets/insights?startDate=${dateStr}`, {
+      const response = await api.get('/tickets/insights', {
+        params: { startDate: dateStr },
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
-      if (response.ok) {
-        const data = await response.json();
-        setInsights(data);
-      }
+      setInsights(response.data);
     } catch (err) {
       console.error('Failed to fetch insights:', err);
     } finally {

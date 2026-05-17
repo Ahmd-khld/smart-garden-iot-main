@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
+import api from '../api';
 
 const Payment = () => {
   const location = useLocation();
@@ -43,14 +44,12 @@ const Payment = () => {
       const token = localStorage.getItem('token');
       if (token) {
         try {
-          const res = await fetch('http://localhost:5000/api/users/profile', {
+          const res = await api.get('/users/profile', {
             headers: { 'Authorization': `Bearer ${token}` }
           });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.savedCards && data.savedCards.length > 0) {
-              setSavedCards(data.savedCards);
-            }
+          const data = res.data;
+          if (data.savedCards && data.savedCards.length > 0) {
+            setSavedCards(data.savedCards);
           }
         } catch (e) {
           console.error('Failed to fetch saved cards');
@@ -94,25 +93,16 @@ const Payment = () => {
     const token = localStorage.getItem('token');
     
     try {
-      const res = await fetch('http://localhost:5000/api/promo/validate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ code: promoCodeInput })
+      const res = await api.post('/promo/validate', { code: promoCodeInput }, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
+      const data = res.data;
       
-      if (res.ok) {
-        setPromoDiscount(data.discount);
-        setIsPromoValid(true);
-      } else {
-        setPromoError(data.message || 'Invalid promo code');
-        setIsPromoValid(false);
-      }
+      setPromoDiscount(data.discount);
+      setIsPromoValid(true);
     } catch (err) {
-      setPromoError('Validation failed');
+      setPromoError(err.response?.data?.message || 'Invalid promo code');
+      setIsPromoValid(false);
     } finally {
       setPromoLoading(false);
     }
@@ -145,13 +135,7 @@ const Payment = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/tickets/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
+      const response = await api.post('/tickets/checkout', { 
             quantities: tickets, 
             selectedDate,
             subscriptionPlan: subscriptionType, 
@@ -165,21 +149,18 @@ const Payment = () => {
             expiry: useSavedCard ? undefined : expiry,
             cvv: useSavedCard ? undefined : cvv,
             promoCode: isPromoValid ? promoCodeInput : undefined
-        })
+      }, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (response.ok || response.status === 201 || response.status === 200) {
-        if (data && data.tickets) {
-          setGeneratedTickets(data.tickets);
-        }
-        setSuccess(true);
-      } else {
-        setError(getPaymentErrorMessage(data));
+      if (data && data.tickets) {
+        setGeneratedTickets(data.tickets);
       }
+      setSuccess(true);
     } catch (err) {
-      setError('Server error during payment processing.');
+      setError(getPaymentErrorMessage(err.response?.data));
     } finally {
       setIsProcessing(false);
     }
@@ -375,7 +356,7 @@ const Payment = () => {
                         placeholder="0000 0000 0000 0000"
                         required
                       />
-                      <svg className="w-6 h-6 text-smart-light absolute left-4 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                      <svg className="w-6 h-6 text-smart-light absolute left-4 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                     </div>
                   </div>
 

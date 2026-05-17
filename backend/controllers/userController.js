@@ -38,6 +38,17 @@ const updateUserProfile = async (req, res) => {
 
             const updatedUser = await user.save();
 
+            const io = req.app.get('io');
+            if (io) {
+                io.emit('userUpdated', {
+                    _id: updatedUser._id,
+                    name: updatedUser.name,
+                    email: updatedUser.email,
+                    phone: updatedUser.phone,
+                    hasDisability: updatedUser.hasDisability
+                });
+            }
+
             res.json({
                 _id: updatedUser._id,
                 name: updatedUser.name,
@@ -161,7 +172,7 @@ const deleteUserProfile = async (req, res) => {
 
         const io = req.app.get('io');
         if (io) {
-            io.emit('userDeleted', req.user._id);
+            io.emit('userDeleted', req.user._id.toString());
             
             // Broadcast updated ticket stats
             const [totalTicketsSold, purchasingUsersAgg, mostSoldAgg, salesAgg] = await Promise.all([

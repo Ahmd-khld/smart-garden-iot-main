@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import api from '../api';
 
 const ResetPassword = () => {
   const { token } = useParams();
@@ -26,24 +27,18 @@ const ResetPassword = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/users/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password })
-      });
+      const response = await api.post('/users/reset-password', { token, password });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (response.status === 200) {
         setMessage({ type: 'success', text: 'Password reset successfully! Redirecting to login...' });
         setTimeout(() => {
           navigate('/');
         }, 3000);
       } else {
-        setMessage({ type: 'error', text: data.message || 'Failed to reset password.' });
+        setMessage({ type: 'error', text: response.data?.message || 'Failed to reset password.' });
       }
     } catch (err) {
-      setMessage({ type: 'error', text: 'Server connection failed.' });
+      setMessage({ type: 'error', text: err.response?.data?.message || 'Server connection failed.' });
     } finally {
       setIsLoading(false);
     }

@@ -33,7 +33,10 @@ const ticketSchema = new mongoose.Schema({
     validUntil: {
         type: Date,
         required: true
-    }
+    },
+    scanHistory: [{
+        type: Date
+    }]
 }, {
     timestamps: true
 });

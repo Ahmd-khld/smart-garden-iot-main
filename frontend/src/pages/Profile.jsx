@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
+import api from '../api';
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState('info');
@@ -27,33 +28,28 @@ const Profile = () => {
 
       try {
         // Fetch Profile & Cards
-        const profileRes = await fetch('http://localhost:5000/api/users/profile', {
+        const profileRes = await api.get('/users/profile', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (profileRes.ok) {
-          const data = await profileRes.json();
-          setUser(data);
-          setName(data.name);
-          setEmail(data.email);
-          setPhone(data.phone);
-          setHasDisability(data.hasDisability);
-        } else {
-          navigate('/');
-          return;
-        }
+        const data = profileRes.data;
+        setUser(data);
+        setName(data.name);
+        setEmail(data.email);
+        setPhone(data.phone);
+        setHasDisability(data.hasDisability);
 
         // Fetch Tickets
-        const ticketsRes = await fetch('http://localhost:5000/api/tickets/history', {
+        const ticketsRes = await api.get('/tickets/history', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (ticketsRes.ok) {
-          const ticketsData = await ticketsRes.json();
-          setTickets(ticketsData);
-        }
+        setTickets(ticketsRes.data);
       } catch (error) {
         console.error('Error fetching profile data:', error);
+        if (error.response?.status === 401) {
+            navigate('/');
+        }
       }
     };
 
@@ -64,39 +60,27 @@ const Profile = () => {
     e.preventDefault();
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:5000/api/users/profile', {
-        method: 'PUT',
+      const response = await api.put('/users/profile', { name, email, phone, hasDisability }, {
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ name, email, phone, hasDisability })
+        }
       });
 
-      if (response.ok) {
-        setMessage('Profile Updated');
-        setTimeout(() => setMessage(''), 3000);
-      } else {
-        const data = await response.json();
-        setMessage(data.message || 'Update failed');
-      }
+      setMessage('Profile Updated');
+      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
-      setMessage('Network error. Update failed.');
+      setMessage(error.response?.data?.message || 'Update failed');
     }
   };
 
   const handleDeleteCard = async (cardId) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/api/users/profile/cards/${cardId}`, {
-        method: 'DELETE',
+      const response = await api.delete(`/users/profile/cards/${cardId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setUser(prev => ({ ...prev, savedCards: data.savedCards }));
-      }
+      setUser(prev => ({ ...prev, savedCards: response.data.savedCards }));
     } catch (error) {
       console.error('Failed to delete card:', error);
     }
@@ -109,21 +93,15 @@ const Profile = () => {
     
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/api/tickets/${ticketId}/cancel`, {
-        method: 'PATCH',
+      const response = await api.patch(`/tickets/${ticketId}/cancel`, {}, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        setTickets(tickets.map(t => t._id === ticketId ? { ...t, status: 'cancelled' } : t));
-        if (selectedQrId === ticketId) setSelectedQrId(null);
-        alert('Ticket cancelled successfully! Your refund has been initiated.');
-      } else {
-        const data = await response.json();
-        alert(data.message || 'Failed to cancel ticket');
-      }
+      setTickets(tickets.map(t => t._id === ticketId ? { ...t, status: 'cancelled' } : t));
+      if (selectedQrId === ticketId) setSelectedQrId(null);
+      alert('Ticket cancelled successfully! Your refund has been initiated.');
     } catch (error) {
-      alert('Network error while cancelling ticket.');
+      alert(error.response?.data?.message || 'Network error while cancelling ticket.');
     }
   };
 
@@ -214,7 +192,7 @@ const Profile = () => {
                 </div>
 
                 <div className="flex items-center p-5 bg-smart-bg dark:bg-gray-700 rounded-2xl border border-smart-light/10 max-w-md">
-                  <input type="checkbox" id="disability" checked={hasDisability} onChange={(e) => setHasDisability(e.target.checked)} className="w-6 h-6 text-smart-light border-gray-300 dark:border-gray-600 rounded focus:ring-smart-light cursor-pointer" />
+                  <input type="checkbox" id="disability" checked={hasDisability} onChange={(e) => setHasDisability(e.target.checked)} className="w-6 h-6 text-smart-light border-gray-300 dark:border-gray-500 rounded focus:ring-smart-light cursor-pointer" />
                   <div className="ml-4">
                     <label htmlFor="disability" className="block text-sm font-black text-smart-dark dark:text-white cursor-pointer italic">Require accessibility features</label>
                     <p className="text-xs text-smart-gray dark:text-gray-400 font-medium mt-1">Wheelchair access, prioritized seating, etc.</p>

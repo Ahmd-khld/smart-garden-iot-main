@@ -388,9 +388,9 @@ const deleteUser = async (req, res) => {
 
         if (io) {
             if (user.role === 'admin') {
-                io.emit('subAdminDeleted', user._id);
+                io.emit('subAdminDeleted', user._id.toString());
             } else {
-                io.emit('userDeleted', user._id);
+                io.emit('userDeleted', user._id.toString());
             }
             
             // Broadcast updated ticket stats

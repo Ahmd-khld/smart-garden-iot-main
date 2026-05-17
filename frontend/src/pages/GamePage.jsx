@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
+import api from '../api';
 
 const GAME_WIDTH = 400;
 const GAME_HEIGHT = 500;
@@ -41,13 +42,10 @@ const GamePage = () => {
 
     const fetchLeaderboard = async () => {
         try {
-            const res = await fetch('http://localhost:5000/api/game/leaderboard', {
+            const res = await api.get('/game/leaderboard', {
                 headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
             });
-            if (res.ok) {
-                const data = await res.json();
-                setLeaderboard(data);
-            }
+            setLeaderboard(res.data);
         } catch (err) {
             console.error('Failed to fetch leaderboard:', err);
         }
@@ -57,10 +55,10 @@ const GamePage = () => {
     useEffect(() => {
         const fetchStatus = async () => {
             try {
-                const res = await fetch('http://localhost:5000/api/game/status', {
+                const res = await api.get('/game/status', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const data = await res.json();
+                const data = res.data;
                 setTrialsUsed(data.trialsUsed);
                 setHasWon(data.hasWon);
                 if (!data.canPlay) {
@@ -163,12 +161,10 @@ const GamePage = () => {
     const handleWin = async () => {
         setGameState('loading');
         try {
-            const res = await fetch('http://localhost:5000/api/game/win', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ score: scoreRef.current })
+            const res = await api.post('/game/win', { score: scoreRef.current }, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-            const data = await res.json();
+            const data = res.data;
             setPromoCode(data.code);
             setGameState('won');
             fetchLeaderboard(); // Refresh scores so the user can see their rank update
@@ -180,16 +176,14 @@ const GamePage = () => {
     const handleLose = async () => {
         setGameState('loading');
         try {
-            await fetch('http://localhost:5000/api/game/lose', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ score: scoreRef.current })
-            });
-            setGameState('lost');
-            const statusRes = await fetch('http://localhost:5000/api/game/status', {
+            await api.post('/game/lose', { score: scoreRef.current }, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const statusData = await statusRes.json();
+            setGameState('lost');
+            const statusRes = await api.get('/game/status', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const statusData = statusRes.data;
             setTrialsUsed(statusData.trialsUsed);
             setHasWon(statusData.hasWon);
             fetchLeaderboard(); // Refresh scores so the user can see their rank update

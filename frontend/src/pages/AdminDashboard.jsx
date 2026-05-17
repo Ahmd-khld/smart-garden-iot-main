@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { socket } from '../socket';
+import api from '../api';
 import AdminHeader from '../components/AdminHeader';
 import WidgetErrorBoundary from '../components/WidgetErrorBoundary';
 
@@ -99,6 +100,10 @@ const AdminDashboard = () => {
   const [newAdminMac, setNewAdminMac] = useState('');
   const [isSubAdminProvisioningExpanded, setIsSubAdminProvisioningExpanded] = useState(true);
   const [isSubAdminsExpanded, setIsSubAdminsExpanded] = useState(true);
+
+  const [syncTrigger, setSyncTrigger] = useState(0);
+  const [backupSyncTrigger, setBackupSyncTrigger] = useState(0);
+  const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0);
   
   const [unreadAuditCount, setUnreadAuditCount] = useState(0);
   const isAuditLogsExpandedRef = useRef(isAuditLogsExpanded);
@@ -107,10 +112,30 @@ const AdminDashboard = () => {
   const [unreadBannedCount, setUnreadBannedCount] = useState(0);
   const isBannedIPsExpandedRef = useRef(isBannedIPsExpanded);
   const alertPageRef = useRef(alertPage);
+  const userPageRef = useRef(userPage);
+  const auditLogPageRef = useRef(auditLogPage);
+  const bannedIPsPageRef = useRef(bannedIPsPage);
+  const whitelistPageRef = useRef(whitelistPage);
 
   useEffect(() => {
     alertPageRef.current = alertPage;
   }, [alertPage]);
+
+  useEffect(() => {
+    userPageRef.current = userPage;
+  }, [userPage]);
+
+  useEffect(() => {
+    auditLogPageRef.current = auditLogPage;
+  }, [auditLogPage]);
+
+  useEffect(() => {
+    bannedIPsPageRef.current = bannedIPsPage;
+  }, [bannedIPsPage]);
+
+  useEffect(() => {
+    whitelistPageRef.current = whitelistPage;
+  }, [whitelistPage]);
 
   useEffect(() => {
     isAuditLogsExpandedRef.current = activeTab === 'security' && isAuditLogsExpanded;
@@ -137,15 +162,16 @@ const AdminDashboard = () => {
     
     const fetchFilteredSales = async () => {
       const token = localStorage.getItem('token');
-      let url = 'http://localhost:5000/api/admin/monthly-sales';
-      const params = new URLSearchParams();
-      if (salesStartDate) params.append('startDate', salesStartDate);
-      if (salesEndDate) params.append('endDate', salesEndDate);
-      if (params.toString()) url += `?${params.toString()}`;
+      const params = {};
+      if (salesStartDate) params.startDate = salesStartDate;
+      if (salesEndDate) params.endDate = salesEndDate;
       
       try {
-        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-        if (res.ok) setMonthlySales(await res.json());
+        const res = await api.get('/admin/monthly-sales', { 
+          params,
+          headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        setMonthlySales(res.data);
       } catch (err) { console.error("Failed to fetch filtered sales", err); }
     };
     fetchFilteredSales();
@@ -161,15 +187,11 @@ const AdminDashboard = () => {
         return;
       }
       const dateStr = insightStartDate.toISOString().split('T')[0];
-      const response = await fetch(`http://localhost:5000/api/tickets/insights?startDate=${dateStr}`, {
+      const response = await api.get('/tickets/insights', {
+        params: { startDate: dateStr },
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setInsights(data);
-      } else {
-        setInsights(null);
-      }
+      setInsights(response.data);
     } catch (err) {
       console.error('Failed to fetch insights:', err);
       setInsights(null);
@@ -192,104 +214,77 @@ const AdminDashboard = () => {
 
     const fetchData = async () => {
       try {
-        const statsRes = await fetch('http://localhost:5000/api/admin/stats', {
+        const statsRes = await api.get('/admin/stats', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        setStats(statsRes.data);
 
-        if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          setStats(statsData);
-        } else if (statsRes.status === 401) {
-          // This is a secondary catch-all in case the token becomes invalid between pages.
+        const usersRes = await api.get('/admin/users', { 
+          params: { role: 'user', page: 1, limit: 10 },
+          headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        setRegularUsers(usersRes.data.users || []);
+        setTotalUserPages(usersRes.data.totalPages || 1);
+        setTotalUsersCount(usersRes.data.totalUsers || 0);
+
+        const adminsRes = await api.get('/admin/users', {
+          params: { role: 'admin' },
+          headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        setSubAdmins(adminsRes.data.users || []);
+
+        if (isSuperAdmin) {
+          const auditLogsRes = await api.get('/admin/audit-logs', {
+            params: { page: 1, limit: 10 },
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          setAuditLogs(auditLogsRes.data.logs);
+          setAuditLogHasMore(auditLogsRes.data.currentPage < auditLogsRes.data.totalPages);
+
+          const bannedIPsRes = await api.get('/admin/banned-ips', {
+            params: { page: 1, limit: 10 },
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          setBannedIPs(bannedIPsRes.data.bannedIPs);
+          setTotalBannedIPs(bannedIPsRes.data.totalBannedIPs || 0);
+          setBannedIPsHasMore(bannedIPsRes.data.currentPage < bannedIPsRes.data.totalPages);
+
+          const whitelistRes = await api.get('/admin/whitelisted-ips', {
+            params: { page: 1, limit: 10 },
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          setWhitelistedIPs(whitelistRes.data.ips);
+          setTotalWhitelistedIPs(whitelistRes.data.totalIps || 0);
+          setWhitelistHasMore(whitelistRes.data.currentPage < whitelistRes.data.totalPages);
+
+          const backupsRes = await api.get('/admin/backups', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          setBackups(backupsRes.data);
+        }
+
+        const salesRes = await api.get('/admin/monthly-sales', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setMonthlySales(salesRes.data);
+
+        const alertsRes = await api.get('/admin/hardware-alerts', {
+          params: { page: 1, limit: 10 },
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setAlerts(alertsRes.data.alerts || (Array.isArray(alertsRes.data) ? alertsRes.data : []));
+        setTotalAlertPages(alertsRes.data.totalPages || 1);
+        setTotalAlertsCount(alertsRes.data.totalAlerts || 0);
+
+        const promoRes = await api.get('/admin/promo-stats', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setPromoStats(promoRes.data);
+      } catch (error) {
+        if (error.response?.status === 401) {
           handleLogout();
           return;
         }
-
-        const usersRes = await fetch('http://localhost:5000/api/admin/users?role=user&page=1&limit=10', { headers: { 'Authorization': `Bearer ${token}` } });
-        if (usersRes.status === 401) { handleLogout(); return; }
-        if (usersRes.ok) {
-          const data = await usersRes.json();
-          setRegularUsers(data.users || []);
-          setTotalUserPages(data.totalPages || 1);
-          setTotalUsersCount(data.totalUsers || 0);
-        }
-
-        const adminsRes = await fetch('http://localhost:5000/api/admin/users?role=admin', { headers: { 'Authorization': `Bearer ${token}` } });
-        if (adminsRes.status === 401) { handleLogout(); return; }
-        if (adminsRes.ok) {
-          const data = await adminsRes.json();
-          setSubAdmins(data.users || []);
-        }
-
-        if (isSuperAdmin) {
-          const auditLogsRes = await fetch('http://localhost:5000/api/admin/audit-logs?page=1&limit=10', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (auditLogsRes.status === 401) { handleLogout(); return; }
-          if (auditLogsRes.ok) {
-            const data = await auditLogsRes.json();
-            setAuditLogs(data.logs);
-            setAuditLogHasMore(data.currentPage < data.totalPages);
-          }
-
-          const bannedIPsRes = await fetch('http://localhost:5000/api/admin/banned-ips?page=1&limit=10', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (bannedIPsRes.status === 401) { handleLogout(); return; }
-          if (bannedIPsRes.ok) {
-            const data = await bannedIPsRes.json();
-            setBannedIPs(data.bannedIPs);
-            setTotalBannedIPs(data.totalBannedIPs || 0);
-            setBannedIPsHasMore(data.currentPage < data.totalPages);
-          }
-
-          const whitelistRes = await fetch('http://localhost:5000/api/admin/whitelisted-ips?page=1&limit=10', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (whitelistRes.status === 401) { handleLogout(); return; }
-          if (whitelistRes.ok) {
-            const data = await whitelistRes.json();
-            setWhitelistedIPs(data.ips);
-            setTotalWhitelistedIPs(data.totalIps || 0);
-            setWhitelistHasMore(data.currentPage < data.totalPages);
-          }
-
-        const backupsRes = await fetch('http://localhost:5000/api/admin/backups', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (backupsRes.status === 401) { handleLogout(); return; }
-        if (backupsRes.ok) {
-          setBackups(await backupsRes.json());
-        }
-        }
-
-        const salesRes = await fetch('http://localhost:5000/api/admin/monthly-sales', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (salesRes.status === 401) { handleLogout(); return; }
-        if (salesRes.ok) {
-          setMonthlySales(await salesRes.json());
-        }
-
-        const alertsRes = await fetch('http://localhost:5000/api/admin/hardware-alerts?page=1&limit=10', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (alertsRes.status === 401) { handleLogout(); return; }
-        if (alertsRes.ok) {
-          const data = await alertsRes.json();
-          setAlerts(data.alerts || (Array.isArray(data) ? data : []));
-          setTotalAlertPages(data.totalPages || 1);
-          setTotalAlertsCount(data.totalAlerts || 0);
-        }
-
-        const promoRes = await fetch('http://localhost:5000/api/admin/promo-stats', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (promoRes.status === 401) { handleLogout(); return; }
-        if (promoRes.ok) {
-          setPromoStats(await promoRes.json());
-        }
-      } catch (error) {
         console.error("Failed to fetch data", error);
       } finally {
         setIsLoadingStats(false);
@@ -301,8 +296,6 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchInsights();
-    const interval = setInterval(fetchInsights, 60000);
-    return () => clearInterval(interval);
   }, [fetchInsights]);
 
   const fetchStats = async () => {
@@ -312,27 +305,20 @@ const AdminDashboard = () => {
       return;
     }
     try {
-      const statsRes = await fetch('http://localhost:5000/api/admin/stats', {
+      const statsRes = await api.get('/admin/stats', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (statsRes.status === 401) { handleLogout(); return; }
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      }
+      setStats(statsRes.data);
 
-
-      const salesRes = await fetch('http://localhost:5000/api/admin/monthly-sales', {
+      const salesRes = await api.get('/admin/monthly-sales', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (salesRes.status === 401) {
+      setMonthlySales(salesRes.data);
+    } catch (error) {
+      if (error.response?.status === 401) {
         handleLogout();
         return;
       }
-      if (salesRes.ok) {
-        setMonthlySales(await salesRes.json());
-      }
-    } catch (error) {
       console.error("Failed to refresh stats", error);
     }
   };
@@ -357,7 +343,7 @@ const AdminDashboard = () => {
     return () => {
       clearTimeout(timer);
       if (scannerRef.current) {
-        try { scannerRef.current.clear().catch(() => {}); } catch(e) {}
+        try { scannerRef.current.clear().catch(() => {}); } catch(e) { console.warn('Scanner clear failed', e); }
         scannerRef.current = null;
       }
     };
@@ -373,38 +359,23 @@ const AdminDashboard = () => {
 
     try {
       setScanMessage(null); // Clear previous message
-      const response = await fetch('http://localhost:5000/api/admin/scan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ ticketId: idToScan })
-      });
+      const response = await api.post('/admin/scan', 
+        { ticketId: idToScan },
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
 
-      const data = await response.json();
+      setScanMessage({ type: 'success', text: response.data.message });
+      // Refresh stats immediately
+      fetchStats();
 
-      if (response.ok) {
-        setScanMessage({ type: 'success', text: data.message });
-
-        // Refresh stats immediately
-        fetchStats();
-
-      } else {
-        setScanMessage({ type: 'error', text: data.message || 'Scan failed' });
-        playErrorBuzz();
-        if (response.status === 401) {
-          console.error('Admin Authorization Error:', data.message);
-          handleLogout();
-        }
-      }
     } catch (error) {
       console.error(error);
-      if (error.response) {
-        console.log(error.response);
-      }
-      setScanMessage({ type: 'error', text: 'Network error or server down.' });
+      const errorMessage = error.response?.data?.message || 'Scan failed';
+      setScanMessage({ type: 'error', text: errorMessage });
       playErrorBuzz();
+      if (error.response?.status === 401) {
+        handleLogout();
+      }
     }
   };
 
@@ -476,7 +447,7 @@ const AdminDashboard = () => {
         }
       }
     } catch (e) {
-      // Not a JWT, use raw string
+      console.warn('QR code is not a JWT, using raw ID', e);
     }
 
     handleScanRequest(finalId);
@@ -498,18 +469,13 @@ const AdminDashboard = () => {
   const handleUnlockScanner = async () => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:5000/api/admin/unlock-scanner', {
-        method: 'POST',
+      const response = await api.post('/admin/unlock-scanner', {}, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        setScanMessage({ type: 'success', text: 'Scanner unlocked successfully.' });
-      } else {
-        const data = await response.json();
-        setScanMessage({ type: 'error', text: data.message || 'Failed to unlock scanner' });
-      }
+      setScanMessage({ type: 'success', text: 'Scanner unlocked successfully.' });
     } catch (error) {
-      setScanMessage({ type: 'error', text: 'Network error.' });
+      const errorMessage = error.response?.data?.message || 'Failed to unlock scanner';
+      setScanMessage({ type: 'error', text: errorMessage });
     }
   };
 
@@ -532,23 +498,20 @@ const AdminDashboard = () => {
       return;
     }
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}/block`, {
-        method: 'PATCH',
+      await api.patch(`/admin/users/${userId}/block`, {}, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        setRegularUsers(prev => prev.map(u => u._id === userId ? { ...u, isBlocked: !currentStatus } : u));
-        setSubAdmins(prev => prev.map(u => u._id === userId ? { ...u, isBlocked: !currentStatus } : u));
-      } else if (response.status === 401) {
+      setRegularUsers(prev => prev.map(u => u._id === userId ? { ...u, isBlocked: !currentStatus } : u));
+      setSubAdmins(prev => prev.map(u => u._id === userId ? { ...u, isBlocked: !currentStatus } : u));
+    } catch (error) {
+      console.error("Failed to toggle block status", error);
+      if (error.response?.status === 401) {
         alert('Your session has expired. Please log in again.');
         handleLogout();
       } else {
-        const data = await response.json();
-        alert(data.message || 'Failed to update user status.');
+        const errorMessage = error.response?.data?.message || 'Failed to update user status.';
+        alert(errorMessage);
       }
-    } catch (error) {
-      console.error("Failed to toggle block status", error);
-      alert('A network error occurred. Please try again.');
     }
   };
 
@@ -563,32 +526,26 @@ const AdminDashboard = () => {
       return;
     }
     try {
-      const response = await fetch('http://localhost:5000/api/admin/sub-admin', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({ name: newAdminName, email: newAdminEmail, password: newAdminPassword, ipAddress: newAdminIp, macAddress: newAdminMac })
-      });
+      const response = await api.post('/admin/sub-admin', 
+        { name: newAdminName, email: newAdminEmail, password: newAdminPassword, ipAddress: newAdminIp, macAddress: newAdminMac },
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
       
-      const data = await response.json();
-      if (response.ok) {
-        setNewAdminName('');
-        setNewAdminEmail('');
-        setNewAdminPassword('');
-        setNewAdminIp('');
-        setNewAdminMac('');
-        alert(data.message);
-      } else if (response.status === 401) {
+      setNewAdminName('');
+      setNewAdminEmail('');
+      setNewAdminPassword('');
+      setNewAdminIp('');
+      setNewAdminMac('');
+      alert(response.data.message);
+    } catch (error) {
+      console.error('Error creating sub-admin:', error);
+      if (error.response?.status === 401) {
         alert('Your session has expired. Please log in again.');
         handleLogout();
       } else {
-        alert(data.message || 'Failed to create sub-admin');
+        const errorMessage = error.response?.data?.message || 'Failed to create sub-admin';
+        alert(errorMessage);
       }
-    } catch (error) {
-      console.error('Error creating sub-admin:', error);
-      alert('Network error while creating sub-admin.');
     }
   };
 
@@ -601,23 +558,20 @@ const AdminDashboard = () => {
       return;
     }
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/users/${userId}`, {
-        method: 'DELETE',
+      await api.delete(`/admin/users/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        // The websocket event 'userDeleted' will handle the UI update.
-        alert('User deleted successfully.');
-      } else if (response.status === 401) {
+      // The websocket event 'userDeleted' will handle the UI update.
+      alert('User deleted successfully.');
+    } catch (error) {
+      console.error("Failed to delete user", error);
+      if (error.response?.status === 401) {
         alert('Your session has expired. Please log in again.');
         handleLogout();
       } else {
-        const data = await response.json();
-        alert(data.message || 'Failed to delete user');
+        const errorMessage = error.response?.data?.message || 'Failed to delete user';
+        alert(errorMessage);
       }
-    } catch (error) {
-      console.error("Failed to delete user", error);
-      alert('A network error occurred. Please try again.');
     }
   };
 
@@ -628,47 +582,35 @@ const AdminDashboard = () => {
 
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:5000/api/admin/reset-occupancy', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      await api.post('/admin/reset-occupancy', {}, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        alert('Park occupancy has been reset successfully.');
-        fetchStats();
-      } else {
-        const data = await response.json();
-        alert(data.message || 'Failed to reset occupancy');
-      }
+      alert('Park occupancy has been reset successfully.');
+      fetchStats();
+      setSyncTrigger(prev => prev + 1);
     } catch (error) {
       console.error("Reset Occupancy Error:", error);
-      alert('Network error while resetting occupancy.');
+      const errorMessage = error.response?.data?.message || 'Failed to reset occupancy';
+      alert(errorMessage);
     }
   };
 
   const handleGenerateDummyTickets = async () => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:5000/api/admin/generate-dummy-tickets', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      await api.post('/admin/generate-dummy-tickets', {}, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        alert('Dummy data generated successfully! The charts will now update.');
-        fetchStats();
-        fetchInsights();
-      } else {
-        const data = await response.json();
-        alert(data.message || 'Failed to generate dummy tickets');
-      }
+      alert('Dummy data generated successfully! The charts will now update.');
+      fetchStats();
+      fetchInsights();
+      setSyncTrigger(prev => prev + 1);
     } catch (error) {
       console.error("Generate Dummy Data Error:", error);
-      alert('Network error while generating dummy data.');
+      const errorMessage = error.response?.data?.message || 'Failed to generate dummy tickets';
+      alert(errorMessage);
     }
   };
 
@@ -679,24 +621,18 @@ const AdminDashboard = () => {
 
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:5000/api/admin/clear-dummy-tickets', {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      await api.delete('/admin/clear-dummy-tickets', {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (response.ok) {
-        alert('All dummy data cleared successfully!');
-        fetchStats();
-        fetchInsights();
-      } else {
-        const data = await response.json();
-        alert(data.message || 'Failed to clear dummy data');
-      }
+      alert('All dummy data cleared successfully!');
+      fetchStats();
+      fetchInsights();
+      setSyncTrigger(prev => prev + 1);
     } catch (error) {
       console.error("Clear Dummy Data Error:", error);
-      alert('Network error while clearing dummy data.');
+      const errorMessage = error.response?.data?.message || 'Failed to clear dummy data';
+      alert(errorMessage);
     }
   };
 
@@ -705,26 +641,23 @@ const AdminDashboard = () => {
     
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:5000/api/admin/backup', {
-        method: 'POST',
+      const response = await api.post('/admin/backup', {}, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await response.json();
-      if (response.ok) {
-        alert(data.message);
-        // Refresh backups list
-        const backupsRes = await fetch('http://localhost:5000/api/admin/backups', {
+      alert(response.data.message);
+      // Refresh backups list
+      try {
+        const backupsRes = await api.get('/admin/backups', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        if (backupsRes.ok) {
-          setBackups(await backupsRes.json());
-        }
-      } else {
-        alert(data.message || 'Backup failed');
+        setBackups(backupsRes.data);
+      } catch (err) {
+        console.error("Failed to refresh backups after manual backup", err);
       }
     } catch (err) {
       console.error('Backup Error:', err);
-      alert('Network error while requesting backup.');
+      const errorMessage = err.response?.data?.message || 'Failed to trigger backup';
+      alert(errorMessage);
     }
   };
 
@@ -732,15 +665,14 @@ const AdminDashboard = () => {
     setIsLoadingAuditLogs(true);
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/audit-logs?page=${auditLogPage + 1}&limit=10`, {
+      const response = await api.get('/admin/audit-logs', {
+        params: { page: auditLogPage + 1, limit: 10 },
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setAuditLogs(prev => [...prev, ...data.logs]);
-        setAuditLogPage(data.currentPage);
-        setAuditLogHasMore(data.currentPage < data.totalPages);
-      }
+      const data = response.data;
+      setAuditLogs(prev => [...prev, ...data.logs]);
+      setAuditLogPage(data.currentPage);
+      setAuditLogHasMore(data.currentPage < data.totalPages);
     } catch (error) {
       console.error("Failed to load older audit logs", error);
     } finally {
@@ -759,21 +691,16 @@ const AdminDashboard = () => {
 
     setIsLoadingAuditLogs(true);
     const token = localStorage.getItem('token');
-    let url = 'http://localhost:5000/api/admin/audit-logs';
-    if (olderThan) url += `?olderThan=${olderThan}`;
     
     try {
-      const response = await fetch(url, {
-        method: 'DELETE',
+      await api.delete('/admin/audit-logs', {
+        params: olderThan ? { olderThan } : {},
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!response.ok) {
-        const data = await response.json();
-        alert(data.message || 'Failed to clear audit logs');
-      }
     } catch (error) {
       console.error("Failed to clear audit logs", error);
-      alert('Network error while clearing audit logs.');
+      const errorMessage = error.response?.data?.message || 'Failed to clear audit logs';
+      alert(errorMessage);
     } finally {
       setIsLoadingAuditLogs(false);
     }
@@ -783,19 +710,14 @@ const AdminDashboard = () => {
     if (!window.confirm('Are you sure you want to completely clear all hardware alerts? This action cannot be undone.')) return;
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:5000/api/admin/hardware-alerts', {
-        method: 'DELETE',
+      await api.delete('/admin/hardware-alerts', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        setAlerts([]); // Clear the local state alerts immediately
-      } else {
-        const data = await response.json();
-        alert(data.message || 'Failed to clear hardware alerts');
-      }
+      setAlerts([]); // Clear the local state alerts immediately
     } catch (error) {
       console.error("Failed to clear hardware alerts", error);
-      alert('Network error while clearing hardware alerts.');
+      const errorMessage = error.response?.data?.message || 'Failed to clear hardware alerts';
+      alert(errorMessage);
     }
   };
 
@@ -803,20 +725,21 @@ const AdminDashboard = () => {
     setIsLoadingBannedIPs(true);
     const token = localStorage.getItem('token');
     try {
-      let url = `http://localhost:5000/api/admin/banned-ips?page=${page}&limit=10`;
-      if (bannedIPsSearchQuery) url += `&search=${encodeURIComponent(bannedIPsSearchQuery)}`;
-      const response = await fetch(url, {
+      const response = await api.get('/admin/banned-ips', {
+        params: {
+          page,
+          limit: 10,
+          ...(bannedIPsSearchQuery ? { search: bannedIPsSearchQuery } : {})
+        },
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        if (append) setBannedIPs(prev => [...prev, ...data.bannedIPs]);
-        else setBannedIPs(data.bannedIPs || []);
-        
-        setTotalBannedIPs(data.totalBannedIPs || 0);
-        setBannedIPsPage(data.currentPage);
-        setBannedIPsHasMore(data.currentPage < data.totalPages);
-      }
+      const data = response.data;
+      if (append) setBannedIPs(prev => [...prev, ...data.bannedIPs]);
+      else setBannedIPs(data.bannedIPs || []);
+      
+      setTotalBannedIPs(data.totalBannedIPs || 0);
+      setBannedIPsPage(data.currentPage);
+      setBannedIPsHasMore(data.currentPage < data.totalPages);
     } catch (error) {
       console.error("Failed to load older banned IPs", error);
     } finally {
@@ -837,18 +760,14 @@ const AdminDashboard = () => {
     if (!window.confirm('Are you sure you want to unban this IP address?')) return;
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/banned-ips/${id}`, {
-        method: 'DELETE',
+      await api.delete(`/admin/banned-ips/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        setBannedIPs(prev => prev.filter(ip => ip._id !== id));
-      } else {
-        const data = await response.json();
-        alert(data.message || 'Failed to unban IP');
-      }
+      setBannedIPs(prev => prev.filter(ip => ip._id !== id));
     } catch (error) {
       console.error('Error unbanning IP:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to unban IP';
+      alert(errorMessage);
     }
   };
 
@@ -858,25 +777,17 @@ const AdminDashboard = () => {
     
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch('http://localhost:5000/api/admin/whitelisted-ips', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify({ ipAddress: newWhitelistIP, description: newWhitelistDesc, macAddress: newWhitelistMac })
-      });
-      
-      const data = await response.json();
-      if (response.ok) {
-        setNewWhitelistIP('');
-        setNewWhitelistDesc('');
-        setNewWhitelistMac('');
-      } else {
-        alert(data.message || 'Failed to add IP');
-      }
+      await api.post('/admin/whitelisted-ips', 
+        { ipAddress: newWhitelistIP, description: newWhitelistDesc, macAddress: newWhitelistMac },
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      setNewWhitelistIP('');
+      setNewWhitelistDesc('');
+      setNewWhitelistMac('');
     } catch (error) {
       console.error('Error adding whitelist IP:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to add IP';
+      alert(errorMessage);
     }
   };
 
@@ -884,29 +795,25 @@ const AdminDashboard = () => {
     if (!window.confirm('Are you sure you want to remove this IP from the whitelist?')) return;
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/whitelisted-ips/${id}`, {
-        method: 'DELETE',
+      const response = await api.delete(`/admin/whitelisted-ips/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!response.ok) {
-        const data = await response.json();
-        alert(data.message || 'Failed to remove IP');
-      }
     } catch (error) {
       console.error('Error removing whitelist IP:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to remove IP';
+      alert(errorMessage);
     }
   };
 
   const handleDownloadBackup = async (filename) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/backups/${filename}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const response = await api.get(`/admin/backups/${filename}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        responseType: 'blob'
       });
-      if (!response.ok) throw new Error('Failed to download');
       
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
@@ -924,19 +831,14 @@ const AdminDashboard = () => {
     if (!window.confirm(`Are you sure you want to permanently delete the backup file: ${filename}?`)) return;
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/backups/${filename}`, {
-        method: 'DELETE',
+      await api.delete(`/admin/backups/${filename}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        setBackups(prev => prev.filter(b => b.filename !== filename));
-      } else {
-        const data = await response.json();
-        alert(data.message || 'Failed to delete backup');
-      }
+      setBackups(prev => prev.filter(b => b.filename !== filename));
     } catch (err) {
       console.error('Delete backup error:', err);
-      alert('Network error while deleting backup.');
+      const errorMessage = err.response?.data?.message || 'Failed to delete backup';
+      alert(errorMessage);
     }
   };
 
@@ -946,27 +848,16 @@ const AdminDashboard = () => {
     setRestoringBackupFilename(filename);
     const token = localStorage.getItem('token');
     try {
-      const response = await fetch(`http://localhost:5000/api/admin/backups/${filename}/restore`, {
-        method: 'POST',
+      const response = await api.post(`/admin/backups/${filename}/restore`, {}, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      let data;
-      try {
-        data = await response.json();
-      } catch (parseError) {
-        throw new Error(`Server returned a non-JSON response (Status: ${response.status}). The backend endpoint might be missing or crashing.`);
-      }
-
-      if (response.ok) {
-        alert(data.message || 'Backup restored successfully!');
-        fetchStats(); // Refresh dashboard stats to reflect the restored data
-      } else {
-        alert(data.message || 'Failed to restore backup');
-      }
+      alert(response.data.message || 'Backup restored successfully!');
+      fetchStats(); // Refresh dashboard stats to reflect the restored data
     } catch (err) {
       console.error('Restore backup error:', err);
-      alert(err.message || 'Network error while restoring backup.');
+      const errorMessage = err.response?.data?.message || 'Network error while restoring backup.';
+      alert(errorMessage);
     } finally {
       setRestoringBackupFilename(null);
     }
@@ -976,20 +867,21 @@ const AdminDashboard = () => {
     setIsLoadingWhitelist(true);
     const token = localStorage.getItem('token');
     try {
-      let url = `http://localhost:5000/api/admin/whitelisted-ips?page=${page}&limit=10`;
-      if (whitelistedIPsSearchQuery) url += `&search=${encodeURIComponent(whitelistedIPsSearchQuery)}`;
-      const response = await fetch(url, {
+      const response = await api.get('/admin/whitelisted-ips', {
+        params: {
+          page,
+          limit: 10,
+          ...(whitelistedIPsSearchQuery ? { search: whitelistedIPsSearchQuery } : {})
+        },
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        if (append) setWhitelistedIPs(prev => [...prev, ...data.ips]);
-        else setWhitelistedIPs(data.ips || []);
-        
-        setTotalWhitelistedIPs(data.totalIps || 0);
-        setWhitelistPage(data.currentPage);
-        setWhitelistHasMore(data.currentPage < data.totalPages);
-      }
+      const data = response.data;
+      if (append) setWhitelistedIPs(prev => [...prev, ...data.ips]);
+      else setWhitelistedIPs(data.ips || []);
+      
+      setTotalWhitelistedIPs(data.totalIps || 0);
+      setWhitelistPage(data.currentPage);
+      setWhitelistHasMore(data.currentPage < data.totalPages);
     } catch (error) {
       console.error("Failed to load older whitelisted IPs", error);
     } finally {
@@ -1010,16 +902,19 @@ const AdminDashboard = () => {
     if (!silent) setIsLoadingAlerts(true);
     const token = localStorage.getItem('token');
     try {
-      let url = `http://localhost:5000/api/admin/hardware-alerts?page=1&limit=10`;
-      if (type !== 'all') url += `&type=${type}`;
-      const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (response.ok) {
-        const data = await response.json();
-        setAlerts(data.alerts || (Array.isArray(data) ? data : []));
-        setAlertPage(1);
-        setTotalAlertPages(data.totalPages || 1);
-        setTotalAlertsCount(data.totalAlerts || 0);
-      }
+      const response = await api.get('/admin/hardware-alerts', {
+        params: {
+          page: 1,
+          limit: 10,
+          ...(type !== 'all' ? { type } : {})
+        },
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = response.data;
+      setAlerts(data.alerts || (Array.isArray(data) ? data : []));
+      setAlertPage(1);
+      setTotalAlertPages(data.totalPages || 1);
+      setTotalAlertsCount(data.totalAlerts || 0);
     } catch(err) {
       console.error(err);
     } finally {
@@ -1035,18 +930,19 @@ const AdminDashboard = () => {
       return;
     }
     try {
-      let url = `http://localhost:5000/api/admin/hardware-alerts?page=${page}&limit=10`;
-      if (alertFilterType !== 'all') url += `&type=${alertFilterType}`;
-      const response = await fetch(url, {
+      const response = await api.get('/admin/hardware-alerts', {
+        params: {
+          page,
+          limit: 10,
+          ...(alertFilterType !== 'all' ? { type: alertFilterType } : {})
+        },
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setAlerts(data.alerts || []);
-        setAlertPage(data.currentPage);
-        setTotalAlertPages(data.totalPages || 1);
-        setTotalAlertsCount(data.totalAlerts || 0);
-      }
+      const data = response.data;
+      setAlerts(data.alerts || []);
+      setAlertPage(data.currentPage);
+      setTotalAlertPages(data.totalPages || 1);
+      setTotalAlertsCount(data.totalAlerts || 0);
     } catch (error) {
       console.error("Failed to load alerts page", error);
     } finally {
@@ -1055,23 +951,106 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchAlertsPage(alertPage, true);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [alertPage, alertFilterType]);
+    if (syncTrigger === 0) return;
+    fetchInsights();
+    const token = localStorage.getItem('token');
+    if (isTokenExpired(token)) return;
+    
+    api.get('/admin/promo-stats', { headers: { 'Authorization': `Bearer ${token}` }})
+      .then(res => { if (res.data) setPromoStats(res.data); })
+      .catch(console.error);
+  }, [syncTrigger, fetchInsights]);
+
+  useEffect(() => {
+    if (backupSyncTrigger === 0) return;
+    const token = localStorage.getItem('token');
+    if (isTokenExpired(token)) return;
+    
+    api.get('/admin/backups', { headers: { 'Authorization': `Bearer ${token}` }})
+      .then(res => { if (res.data) setBackups(res.data); })
+      .catch(console.error);
+  }, [backupSyncTrigger]);
+
+  const fetchSubAdmins = async () => {
+    const token = localStorage.getItem('token');
+    if (!token || isTokenExpired(token)) return;
+    try {
+      const adminsRes = await api.get('/admin/users', {
+        params: { role: 'admin' },
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setSubAdmins(adminsRes.data.users || []);
+    } catch (err) {
+      console.error('Failed to fetch sub-admins:', err);
+    }
+  };
+
+  const fetchUsers = async (page = 1) => {
+    const token = localStorage.getItem('token');
+    if (isTokenExpired(token)) {
+      handleLogout();
+      return;
+    }
+
+    try {
+      const res = await api.get('/admin/users', {
+        params: {
+          role: 'user',
+          page,
+          limit: 10,
+          ...(searchQuery ? { search: searchQuery } : {}),
+          ...(filterStatus !== 'all' ? { status: filterStatus } : {})
+        },
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = res.data;
+      setRegularUsers(data.users || []);
+      setTotalUserPages(data.totalPages || 1);
+      setTotalUsersCount(data.totalUsers || 0);
+      setUserPage(page);
+    } catch (error) {
+      if (error.response?.status === 401) {
+        handleLogout();
+      }
+      console.error(error);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.removeItem('adminEmail');
+    navigate('/');
+  };
+
+  useEffect(() => {
+    if (dataRefreshTrigger === 0) return;
+    fetchStats();
+    fetchAlertsPage(1, true);
+    fetchUsers(userPage);
+    fetchSubAdmins();
+  }, [dataRefreshTrigger]);
 
   // Connect to real-time WebSockets
   useEffect(() => {
-    if (!socket.connected) {
-      socket.connect();
+    const token = localStorage.getItem('token');
+    if (token) {
+      socket.auth = { token };
+      if (!socket.connected) {
+        socket.connect();
+      }
     }
 
     const onConnect = () => {
-      console.log('✅ Connected to WebSocket server! Socket ID:', socket.id);
+      console.log('✅ WebSocket Connected! Socket ID:', socket.id);
+    };
+
+    const onConnectError = (err) => {
+      console.error('❌ WebSocket Connection Error:', err.message);
     };
 
     const onHardwareAlert = (newAlert) => {
+      console.log('🔔 Received Real-time Hardware Alert:', newAlert);
       const formattedAlert = {
         _id: newAlert.id || newAlert._id,
         message: newAlert.message,
@@ -1092,6 +1071,7 @@ const AdminDashboard = () => {
     };
 
     const onOccupancyUpdate = (data) => {
+      console.log('📊 Received Occupancy Update:', data);
       setStats(prev => prev ? {
         ...prev,
         currentOccupancy: data.currentOccupancy,
@@ -1100,41 +1080,65 @@ const AdminDashboard = () => {
     };
 
     const onTotalTicketsUpdate = (data) => {
+      console.log('🎟️ Received Ticket Stats Update:', data);
       setStats(prev => prev ? {
         ...prev,
         totalTicketsSold: data.totalTicketsSold,
         purchasingUsers: data.purchasingUsers,
         mostSoldTicket: data.mostSoldTicket,
       } : null);
+      setSyncTrigger(prev => prev + 1);
+    };
+
+    const onPromoStatsUpdate = () => {
+        console.log('💰 Received Promo Stats Update');
+        setSyncTrigger(prev => prev + 1);
+    };
+    const onBackupsUpdate = () => {
+        console.log('💾 Received Backups Update');
+        setBackupSyncTrigger(prev => prev + 1);
+    };
+    const onDataRefresh = () => {
+      console.log('🔄 Received Global Data Refresh Signal');
+      setSyncTrigger(prev => prev + 1);
+      setBackupSyncTrigger(prev => prev + 1);
+      setDataRefreshTrigger(prev => prev + 1);
     };
 
     const onMonthlySalesUpdate = (newSalesData) => {
+      console.log('📈 Received Monthly Sales Update');
       if (!isSalesFilteredRef.current) {
         setMonthlySales(newSalesData);
       }
     };
 
     const onAuditLogUpdate = (newLog) => {
-      setAuditLogs(prevLogs => [newLog, ...prevLogs]); // Prepend new logs instantly
+      console.log('🛡️ Received New Audit Log:', newLog);
+      setAuditLogs(prevLogs => {
+        if (auditLogPageRef.current === 1) {
+          return [newLog, ...prevLogs].slice(0, 50);
+        }
+        return prevLogs;
+      });
       if (!isAuditLogsExpandedRef.current) {
         setUnreadAuditCount(prev => prev + 1);
       }
     };
 
     const onAuditLogsCleared = async (data) => {
+      console.log('🧹 Received Audit Logs Cleared signal');
       if (data && data.partial) {
         const token = localStorage.getItem('token');
         if (token) {
           try {
-            const res = await fetch('http://localhost:5000/api/admin/audit-logs?page=1&limit=50', {
+            const res = await api.get('/admin/audit-logs', {
+              params: { page: 1, limit: 50 },
               headers: { 'Authorization': `Bearer ${token}` },
             });
-            if (res.ok) {
-              const json = await res.json();
-              setAuditLogs(json.logs);
-              setAuditLogPage(1);
-              setAuditLogHasMore(json.currentPage < json.totalPages);
-            }
+            const json = res.data;
+            setAuditLogs(json.logs);
+            setAuditLogPage(1);
+            setAuditLogHasMore(json.currentPage < json.totalPages);
           } catch (err) {
             console.error('Failed to refetch after partial clear', err);
           }
@@ -1148,20 +1152,20 @@ const AdminDashboard = () => {
     };
 
     const onHardwareAlertsCleared = async (data) => {
+      console.log('🧹 Received Hardware Alerts Cleared signal');
       if (data && data.partial) {
         const token = localStorage.getItem('token');
         if (token) {
           try {
-            const res = await fetch('http://localhost:5000/api/admin/hardware-alerts?page=1&limit=10', {
+            const res = await api.get('/admin/hardware-alerts', {
+              params: { page: 1, limit: 10 },
               headers: { 'Authorization': `Bearer ${token}` },
             });
-            if (res.ok) {
-              const json = await res.json();
-              setAlerts(json.alerts || (Array.isArray(json) ? json : []));
-              setAlertPage(1);
-              setTotalAlertPages(json.totalPages || 1);
-              setTotalAlertsCount(json.totalAlerts || 0);
-            }
+            const json = res.data;
+            setAlerts(json.alerts || (Array.isArray(json) ? json : []));
+            setAlertPage(1);
+            setTotalAlertPages(json.totalPages || 1);
+            setTotalAlertsCount(json.totalAlerts || 0);
           } catch (err) {
             console.error('Failed to refetch hardware alerts after partial clear', err);
           }
@@ -1176,36 +1180,61 @@ const AdminDashboard = () => {
     };
 
     const onBannedIpAdded = (newBannedIp) => {
-      setBannedIPs(prev => [newBannedIp, ...prev]);
+      console.log('🚫 Received New Banned IP:', newBannedIp);
+      setBannedIPs(prev => {
+        if (bannedIPsPageRef.current === 1) {
+          return [newBannedIp, ...prev].slice(0, 50);
+        }
+        return prev;
+      });
+      setTotalBannedIPs(prev => prev + 1);
       if (!isBannedIPsExpandedRef.current) {
         setUnreadBannedCount(prev => prev + 1);
       }
     };
 
     const onBannedIpRemoved = (removedId) => {
+      console.log('✅ Received Banned IP Removed signal for ID:', removedId);
       setBannedIPs(prev => prev.filter(ip => ip._id !== removedId));
+      setTotalBannedIPs(prev => Math.max(prev - 1, 0));
     };
 
     const onWhitelistIpAdded = (newIp) => {
-      setWhitelistedIPs(prev => [newIp, ...prev]);
+      console.log('⚪ Received New Whitelisted IP:', newIp);
+      setWhitelistedIPs(prev => {
+        if (whitelistPageRef.current === 1) {
+          return [newIp, ...prev].slice(0, 50);
+        }
+        return prev;
+      });
+      setTotalWhitelistedIPs(prev => prev + 1);
     };
 
     const onWhitelistIpRemoved = (removedId) => {
+      console.log('🗑️ Received Whitelist IP Removed signal for ID:', removedId);
       setWhitelistedIPs(prev => prev.filter(ip => ip._id !== removedId));
+      setTotalWhitelistedIPs(prev => Math.max(prev - 1, 0));
     };
 
     const onSubAdminCreated = (newAdmin) => {
+      console.log('👤 Received New Sub-Admin:', newAdmin);
       if (!isSuperAdmin) return;
       setSubAdmins(prevUsers => [newAdmin, ...prevUsers]);
     };
 
     const onNewUserRegistered = (newUser) => {
+      console.log('🆕 Received New User Registration:', newUser);
       if (!isSuperAdmin && newUser.role === 'admin') return;
 
       if (newUser.role === 'admin') {
         setSubAdmins(prev => [newUser, ...prev]);
       } else {
-        setRegularUsers(prev => [newUser, ...prev].slice(0, 10));
+        setRegularUsers(prev => {
+          if (userPageRef.current === 1) {
+            return [newUser, ...prev].slice(0, 10);
+          }
+          return prev;
+        });
         setTotalUsersCount(prev => prev + 1);
         setStats(prev => prev ? {
           ...prev,
@@ -1215,11 +1244,19 @@ const AdminDashboard = () => {
     };
 
     const onUserStatusUpdate = ({ userId, isBlocked }) => {
+      console.log(`🔐 Received User Status Update: ID ${userId}, Blocked: ${isBlocked}`);
       setRegularUsers(prev => prev.map(u => u._id === userId ? { ...u, isBlocked } : u));
       setSubAdmins(prev => prev.map(u => u._id === userId ? { ...u, isBlocked } : u));
     };
 
+    const onUserUpdated = (updatedUser) => {
+      console.log('👤 Received User Update Signal:', updatedUser);
+      setRegularUsers(prev => prev.map(u => u._id === updatedUser._id ? { ...u, ...updatedUser } : u));
+      setSubAdmins(prev => prev.map(u => u._id === updatedUser._id ? { ...u, ...updatedUser } : u));
+    };
+
     const onUserDeleted = (deletedUserId) => {
+      console.log('🗑️ Received User Deleted Signal for ID:', deletedUserId);
       setRegularUsers(prev => prev.filter(u => u._id !== deletedUserId));
       setTotalUsersCount(prev => Math.max(prev - 1, 0));
       setStats(prev => prev ? {
@@ -1229,13 +1266,18 @@ const AdminDashboard = () => {
     };
 
     const onSubAdminDeleted = (deletedAdminId) => {
+      console.log('🗑️ Received Sub-Admin Deleted Signal for ID:', deletedAdminId);
       setSubAdmins(prev => prev.filter(u => u._id !== deletedAdminId));
     };
 
     socket.on('connect', onConnect);
+    socket.on('connect_error', onConnectError);
     socket.on('hardwareAlert', onHardwareAlert);
     socket.on('occupancyUpdate', onOccupancyUpdate);
     socket.on('totalTicketsUpdate', onTotalTicketsUpdate);
+    socket.on('promoStatsUpdate', onPromoStatsUpdate);
+    socket.on('backupsUpdate', onBackupsUpdate);
+    socket.on('dataRefresh', onDataRefresh);
     socket.on('monthlySalesUpdate', onMonthlySalesUpdate);
     socket.on('auditLogUpdate', onAuditLogUpdate);
     socket.on('auditLogsCleared', onAuditLogsCleared);
@@ -1247,15 +1289,20 @@ const AdminDashboard = () => {
     socket.on('subAdminCreated', onSubAdminCreated);
     socket.on('newUserRegistered', onNewUserRegistered);
     socket.on('userStatusUpdate', onUserStatusUpdate);
+    socket.on('userUpdated', onUserUpdated);
     socket.on('userDeleted', onUserDeleted);
     socket.on('subAdminDeleted', onSubAdminDeleted);
 
     return () => {
       // Only remove the listeners for this component, do not disconnect the socket
       socket.off('connect', onConnect);
+      socket.off('connect_error', onConnectError);
       socket.off('hardwareAlert', onHardwareAlert);
       socket.off('occupancyUpdate', onOccupancyUpdate);
       socket.off('totalTicketsUpdate', onTotalTicketsUpdate);
+      socket.off('promoStatsUpdate', onPromoStatsUpdate);
+      socket.off('backupsUpdate', onBackupsUpdate);
+      socket.off('dataRefresh', onDataRefresh);
       socket.off('monthlySalesUpdate', onMonthlySalesUpdate);
       socket.off('auditLogUpdate', onAuditLogUpdate);
       socket.off('auditLogsCleared', onAuditLogsCleared);
@@ -1267,6 +1314,7 @@ const AdminDashboard = () => {
       socket.off('subAdminCreated', onSubAdminCreated);
       socket.off('newUserRegistered', onNewUserRegistered);
       socket.off('userStatusUpdate', onUserStatusUpdate);
+      socket.off('userUpdated', onUserUpdated);
       socket.off('userDeleted', onUserDeleted);
       socket.off('subAdminDeleted', onSubAdminDeleted);
     };
@@ -1305,40 +1353,6 @@ const AdminDashboard = () => {
     document.body.removeChild(link);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
-    localStorage.removeItem('adminEmail');
-    navigate('/');
-  };
-
-  const fetchUsers = async (page = 1) => {
-    const token = localStorage.getItem('token');
-    if (isTokenExpired(token)) {
-      handleLogout();
-      return;
-    }
-
-    try {
-      let url = `http://localhost:5000/api/admin/users?role=user&page=${page}&limit=10`;
-      if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
-      if (filterStatus !== 'all') url += `&status=${filterStatus}`;
-      
-      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (res.ok) {
-        const data = await res.json();
-        setRegularUsers(data.users || []);
-        setTotalUserPages(data.totalPages || 1);
-        setTotalUsersCount(data.totalUsers || 0);
-        setUserPage(page);
-      } else if (res.status === 401) {
-        handleLogout();
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   useEffect(() => {
     setUserPage(1);
   }, [searchQuery, filterStatus]);
@@ -1354,13 +1368,17 @@ const AdminDashboard = () => {
 
   const handleExportUsersCSV = async () => {
     const token = localStorage.getItem('token');
-    let url = `http://localhost:5000/api/admin/users?role=user&limit=10000`;
-    if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
-    if (filterStatus !== 'all') url += `&status=${filterStatus}`;
-    
     try {
-      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-      const data = await res.json();
+      const res = await api.get('/admin/users', {
+        params: {
+          role: 'user',
+          limit: 10000,
+          ...(searchQuery ? { search: searchQuery } : {}),
+          ...(filterStatus !== 'all' ? { status: filterStatus } : {})
+        },
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = res.data;
       const exportData = data.users || [];
       if (exportData.length === 0) return;
     
@@ -1415,11 +1433,15 @@ const AdminDashboard = () => {
 
   const handleExportBannedIPsCSV = async () => {
     const token = localStorage.getItem('token');
-    let url = `http://localhost:5000/api/admin/banned-ips?limit=10000`;
-    if (bannedIPsSearchQuery) url += `&search=${encodeURIComponent(bannedIPsSearchQuery)}`;
     try {
-      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-      const data = await res.json();
+      const res = await api.get('/admin/banned-ips', {
+        params: {
+          limit: 10000,
+          ...(bannedIPsSearchQuery ? { search: bannedIPsSearchQuery } : {})
+        },
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = res.data;
       const exportData = data.bannedIPs || [];
       if (exportData.length === 0) return;
     
@@ -1449,11 +1471,15 @@ const AdminDashboard = () => {
 
   const handleExportWhitelistedIPsCSV = async () => {
     const token = localStorage.getItem('token');
-    let url = `http://localhost:5000/api/admin/whitelisted-ips?limit=10000`;
-    if (whitelistedIPsSearchQuery) url += `&search=${encodeURIComponent(whitelistedIPsSearchQuery)}`;
     try {
-      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-      const data = await res.json();
+      const res = await api.get('/admin/whitelisted-ips', {
+        params: {
+          limit: 10000,
+          ...(whitelistedIPsSearchQuery ? { search: whitelistedIPsSearchQuery } : {})
+        },
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = res.data;
       const exportData = data.ips || [];
       if (exportData.length === 0) return;
     

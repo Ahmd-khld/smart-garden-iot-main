@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MonkeyForm from '../components/MonkeyForm.jsx';
+import api from '../api';
 
 const LandingPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -23,42 +24,28 @@ const LandingPage = () => {
     setError('');
     setIsLoading(true);
 
-    const url = isLogin 
-      ? 'http://localhost:5000/api/login' 
-      : 'http://localhost:5000/api/register';
+    const path = isLogin ? '/login' : '/register';
     
     const payload = isLogin 
       ? { email, password }
       : { name, email, phone, age: Number(age), hasDisability, password, role: 'user' };
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const response = await api.post(path, payload);
+      const data = response.data;
 
-      const data = await response.json();
-
-      if (response.ok) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('role', data.role || 'user');
-        localStorage.setItem('adminEmail', isLogin ? email : data.email);
-        
-        if (data.role === 'admin') {
-            navigate('/admin/dashboard');
-        } else {
-            navigate('/book');
-        }
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('role', data.role || 'user');
+      localStorage.setItem('adminEmail', isLogin ? email : data.email);
+      
+      if (data.role === 'admin') {
+          navigate('/admin/dashboard');
       } else {
-        setError(data.message || 'Authentication failed. Please try again.');
+          navigate('/book');
       }
     } catch (err) {
-      if (err.message === 'Failed to fetch') {
-        console.log('Backend is unreachable or blocked by CORS');
-      }
-      alert(err.message);
-      setError(`Server connection failed: ${err.message}`);
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || `Server connection failed: ${err.message}`;
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -70,22 +57,16 @@ const LandingPage = () => {
     setIsForgotLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/users/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotEmail })
-      });
+      const response = await api.post('/users/forgot-password', { email: forgotEmail });
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (response.status === 200) {
         setForgotMessage({ type: 'success', text: 'Reset link sent! Please check your email inbox.' });
         setForgotEmail('');
       } else {
-        setForgotMessage({ type: 'error', text: data.message || 'Failed to send reset link.' });
+        setForgotMessage({ type: 'error', text: response.data?.message || 'Failed to send reset link.' });
       }
     } catch (err) {
-      setForgotMessage({ type: 'error', text: 'Server connection failed.' });
+      setForgotMessage({ type: 'error', text: err.response?.data?.message || 'Server connection failed.' });
     } finally {
       setIsForgotLoading(false);
     }

@@ -181,11 +181,6 @@ app.use('/api/login', async (req, res, next) => {
         const clientMac = req.body.macAddress || ''; // Sent by custom clients; browsers cannot send MAC natively
 
         const whitelistedDocs = await WhitelistedIP.find({}).lean();
-        const dbIps = whitelistedDocs.map(doc => doc.ipAddress);
-        const envIps = (process.env.ADMIN_WHITELISTED_IPS || '127.0.0.1,::1,192.168.1.22')
-          .split(',')
-          .map(ip => ip.trim())
-          .filter(Boolean);
         
         let isAllowed = false;
 
@@ -341,6 +336,9 @@ cron.schedule('0 2 * * *', () => {
     }
     console.log(`Automated backup successful: ${archivePath}`);
     
+    const io = app.get('io');
+    if (io) io.emit('backupsUpdate');
+    
     // Cleanup backups older than 7 days to save disk space
     try {
       fs.readdirSync(backupDir).forEach(file => {
@@ -371,6 +369,49 @@ app.use('/api/register', (req, res, next) => {
       }
     }
   });
+  next();
+});
+
+// Centralized WebSocket Broadcaster for Admin Actions
+app.use('/api/admin', (req, res, next) => {
+  if (['POST', 'PATCH', 'DELETE', 'PUT'].includes(req.method)) {
+    res.on('finish', () => {
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        const io = req.app.get('io');
+        if (!io) return;
+
+        try {
+          const urlObj = new URL(req.originalUrl, `http://${req.headers.host || 'localhost'}`);
+          const pathOnly = urlObj.pathname;
+          // Robust ID extraction: ignore trailing slashes
+          const pathParts = pathOnly.split('/').filter(Boolean);
+          const id = pathParts.pop();
+
+          console.log(`[Socket Broadcast] Admin Action: ${req.method} ${pathOnly} (ID: ${id})`);
+
+          // Precise Event Routing for specific items
+          if (pathOnly.match(/\/users\/[^\/]+\/?$/) && req.method === 'DELETE') {
+            console.log(`[Socket Broadcast] Emitting userDeleted and subAdminDeleted for ID: ${id}`);
+            io.emit('userDeleted', id.toString());
+            io.emit('subAdminDeleted', id.toString());
+          } else if (pathOnly.includes('/audit-logs') && req.method === 'DELETE') {
+            io.emit('auditLogsCleared', { partial: urlObj.searchParams.has('olderThan') });
+          } else if (pathOnly.match(/\/banned-ips\/[^\/]+\/?$/) && req.method === 'DELETE') {
+            io.emit('bannedIpRemoved', id.toString());
+          } else if (pathOnly.match(/\/whitelisted-ips\/[^\/]+\/?$/) && req.method === 'DELETE') {
+            io.emit('whitelistIpRemoved', id.toString());
+          } else if (pathOnly.includes('/hardware-alerts') && req.method === 'DELETE') {
+            io.emit('hardwareAlertsCleared');
+          } else if (pathOnly.includes('/backup') || pathOnly.includes('/backups')) {
+            io.emit('backupsUpdate');
+          }
+          
+          // Global UI Refresh (Catch-all for stats, sales, and dummy data updates)
+          io.emit('dataRefresh');
+        } catch (e) { console.error('Socket Broadcast Error:', e); }
+      }
+    });
+  }
   next();
 });
 
@@ -478,6 +519,8 @@ app.post('/api/admin/generate-dummy-tickets', requireSuperAdmin, async (req, res
 
     await Ticket.insertMany(dummyTickets);
     await logAdminActionServer(req, 'Generated 3000 dummy tickets for analytics');
+    const io = req.app.get('io');
+    if (io) io.emit('dataRefresh');
     res.json({ message: 'Successfully generated 3000 dummy tickets with crowd spikes!' });
   } catch (error) {
     console.error('Dummy Data Error:', error);
@@ -490,6 +533,8 @@ app.delete('/api/admin/clear-dummy-tickets', requireSuperAdmin, async (req, res)
   try {
     await Ticket.deleteMany({});
     await logAdminActionServer(req, 'Cleared all dummy ticket data');
+    const io = req.app.get('io');
+    if (io) io.emit('dataRefresh');
     res.json({ message: 'Successfully cleared all dummy tickets!' });
   } catch (error) {
     console.error('Clear Dummy Data Error:', error);
@@ -521,6 +566,8 @@ app.post('/api/admin/backups/:filename/restore', requireSuperAdmin, async (req, 
       
       console.log(`Restore successful: ${stdout}`);
       await logAdminActionServer(req, `Restored database backup from file: ${filename}`);
+      const io = req.app.get('io');
+      if (io) io.emit('dataRefresh');
       res.status(200).json({ message: 'Database successfully restored from backup!' });
     });
   } catch (error) {

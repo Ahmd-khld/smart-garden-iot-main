@@ -369,6 +369,8 @@ const checkout = async (req, res) => {
                 { code: promoCode, userId: req.user._id, isUsed: false },
                 { isUsed: true }
             );
+            const io = req.app.get('io');
+            if (io) io.emit('promoStatsUpdate');
         }
 
         return res.status(200).json({
@@ -483,6 +485,7 @@ const cancelTicket = async (req, res) => {
                 revenue: s.revenue
             })).reverse();
             io.emit('monthlySalesUpdate', formattedSales);
+            io.emit('dataRefresh');
         }
 
         res.json({ message: 'Ticket cancelled successfully. Refund initiated.' });
