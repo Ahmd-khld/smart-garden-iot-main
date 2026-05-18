@@ -111,6 +111,9 @@ const CustomModal = ({
   type,
   isPrompt,
   placeholder,
+  inputType = 'text',
+  min,
+  max,
   onClose,
   onConfirm,
 }) => {
@@ -223,11 +226,13 @@ const CustomModal = ({
           {isPrompt && (
             <input
               ref={inputRef}
-              type="text"
+              type={inputType}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
+              min={min}
+              max={max}
               style={{
                 width: '100%',
                 padding: '16px',

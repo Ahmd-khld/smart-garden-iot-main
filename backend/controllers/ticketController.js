@@ -9,15 +9,38 @@ const IV_LENGTH = 16;
 const DAILY_CAPACITY = parseInt(process.env.DAILY_CAPACITY) || 1000;
 
 const isDateValidForBooking = (date) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const maxDate = new Date(today);
+  const now = new Date();
+  // Server's local midnight
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
   const bookingWindow = parseInt(process.env.BOOKING_WINDOW_DAYS) || 30;
-  maxDate.setDate(maxDate.getDate() + bookingWindow); // Booking window from env
+  const maxDate = new Date(today);
+  maxDate.setDate(maxDate.getDate() + bookingWindow);
 
-  const checkDate = new Date(date);
-  checkDate.setHours(0, 0, 0, 0);
-  return checkDate >= today && checkDate <= maxDate;
+  let checkDate;
+  if (typeof date === 'string' && date.includes('-')) {
+    const [year, month, day] = date.split('-').map(Number);
+    checkDate = new Date(year, month - 1, day);
+  } else {
+    checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+  }
+
+  // To handle the case where the server has rolled over to the next day 
+  // but it's still "today" for the user, we allow a 1-day grace period for "yesterday"
+  // from the server's perspective, as long as it's the user's today.
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  return checkDate >= yesterday && checkDate <= maxDate;
+};
+
+const formatDateLocal = (date) => {
+  const d = new Date(date);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 };
 
 const getCrowdLevel = (count) => {
@@ -87,51 +110,95 @@ const savePaymentCardIfRequested = async ({
 };
 
 const buildEmailTicketHtml = ({ user, tickets, selectedDate, subscriptionPlan }) => {
-  const ticketList = tickets
-    .map(
-      (ticket) => `
-            <li>
-                <strong>${ticket.ticketType.toUpperCase()} Ticket</strong><br/>
-                Ticket ID: ${ticket._id}<br/>
-                Price: ${ticket.price} EGP
-            </li>
-        `
-    )
-    .join('');
-
   const validity =
     subscriptionPlan === 'monthly'
       ? 'Valid for 30 days from today.'
-      : `Valid only on ${new Date(selectedDate).toLocaleDateString()}.`;
+      : `Valid strictly on <strong>${new Date(selectedDate).toLocaleDateString()}</strong>.`;
+
+  const ticketItems = tickets
+    .map(
+      (ticket) => `
+    <div style="background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+      <div style="flex: 1;">
+        <p style="margin: 0; font-size: 12px; font-weight: 800; color: #80C241; text-transform: uppercase; letter-spacing: 0.1em;">${ticket.ticketType} Pass</p>
+        <h3 style="margin: 4px 0 12px 0; font-size: 20px; font-weight: 900; color: #111827; font-style: italic;">Ticket ID: ${ticket._id.toString().slice(-8).toUpperCase()}</h3>
+        <div style="display: flex; gap: 16px;">
+          <div>
+            <p style="margin: 0; font-size: 10px; color: #6b7280; font-weight: 700; text-transform: uppercase;">Price</p>
+            <p style="margin: 2px 0 0 0; font-size: 16px; font-weight: 800; color: #111827;">${ticket.price} EGP</p>
+          </div>
+        </div>
+      </div>
+      <div style="margin-left: 20px; background-color: white; padding: 8px; border-radius: 12px; border: 2px solid #111827;">
+        <img src="cid:qr-${ticket._id}" alt="QR Code" width="100" height="100" style="display: block;" />
+      </div>
+    </div>
+  `
+    )
+    .join('');
 
   return `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-            <h2>Smart Park Ticket Confirmation</h2>
-            <p>Hello ${user.name},</p>
-            <p>Thank you for booking your ticket.</p>
-            <p>Your QR code ticket image is attached to this email.</p>
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Smart Garden Tickets</title>
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);">
+        <!-- Header -->
+        <tr>
+          <td style="background-color: #111827; padding: 40px 40px 30px 40px; text-align: center;">
+            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 900; font-style: italic; letter-spacing: -0.02em;">SMART <span style="color: #80C241;">GARDEN</span></h1>
+            <p style="margin: 10px 0 0 0; color: #9ca3af; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.2em;">Official Confirmation</p>
+          </td>
+        </tr>
+        
+        <!-- Content -->
+        <tr>
+          <td style="padding: 40px;">
+            <h2 style="margin: 0 0 16px 0; color: #111827; font-size: 24px; font-weight: 800;">Hello ${user.name},</h2>
+            <p style="margin: 0 0 32px 0; color: #4b5563; font-size: 16px; line-height: 1.6;">Your booking is confirmed! We've generated your entry passes below. Please show these QR codes at the gate for scanning.</p>
+            
+            <div style="margin-bottom: 32px; padding: 16px; background-color: #f0fdf4; border-left: 4px solid #80C241; border-radius: 4px;">
+              <p style="margin: 0; color: #166534; font-size: 14px; font-weight: 600;">${validity}</p>
+            </div>
 
-            <h3>Your Tickets:</h3>
-            <ul>
-                ${ticketList}
-            </ul>
+            <!-- Ticket List -->
+            ${ticketItems}
 
-            <p><strong>Validity:</strong> ${validity}</p>
-            <p>Please show the attached QR code at the entrance.</p>
-        </div>
-    `;
+            <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e7eb; text-align: center;">
+              <p style="margin: 0; color: #6b7280; font-size: 14px;">Questions? Reply to this email or visit our help center.</p>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="margin: 0; color: #9ca3af; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em;">&copy; 2026 Smart Garden IoT. All rights reserved.</p>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
 };
 
 const sendTicketsViaEmail = async ({ user, tickets, selectedDate, subscriptionPlan }) => {
-  if (!tickets.length) {
+  if (!tickets || !tickets.length) {
+    console.log('Skipping email: No tickets provided.');
     return { status: 'skipped', reason: 'No tickets were created' };
   }
 
-  if (!user.email) {
+  if (!user || !user.email) {
+    console.log('Skipping email: User has no email address.');
     return { status: 'skipped', reason: 'User has no email address' };
   }
 
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.error('Email configuration missing: EMAIL_USER or EMAIL_PASS not set in environment.');
     return { status: 'skipped', reason: 'Email credentials are not configured' };
   }
 
@@ -143,46 +210,69 @@ const sendTicketsViaEmail = async ({ user, tickets, selectedDate, subscriptionPl
     },
   });
 
-  const attachments = [];
-
-  for (const ticket of tickets) {
-    const qrData = JSON.stringify({
-      ticketId: ticket._id.toString(),
-      userId: user._id.toString(),
-      ticketType: ticket.ticketType,
-      subscriptionPlan: ticket.subscriptionPlan,
-      validFrom: ticket.validFrom,
-      validUntil: ticket.validUntil,
-    });
-
-    const qrImage = await QRCode.toBuffer(qrData);
-
-    attachments.push({
-      filename: `smart-park-ticket-${ticket._id}.png`,
-      content: qrImage,
-      contentType: 'image/png',
-    });
+  try {
+    // Verify connection configuration
+    await transporter.verify();
+    console.log('SMTP server connection verified successfully.');
+  } catch (verifyError) {
+    console.error('SMTP Verification Failed:', verifyError);
+    return { status: 'failed', error: 'SMTP connection failed', details: verifyError.message };
   }
 
-  console.log(
-    `Attempting to send ticket email to ${user.email} with ${attachments.length} attachments...`
-  );
+  const attachmentPromises = tickets.map(async (ticket) => {
+    try {
+      const qrData = JSON.stringify({
+        ticketId: ticket._id.toString(),
+        userId: user._id.toString(),
+        ticketType: ticket.ticketType,
+        subscriptionPlan: ticket.subscriptionPlan,
+        validFrom: ticket.validFrom,
+        validUntil: ticket.validUntil,
+      });
 
-  const info = await transporter.sendMail({
-    from: `"Smart Park" <${process.env.EMAIL_USER}>`,
-    to: user.email,
-    subject: 'Your Smart Park Ticket QR Code',
-    html: buildEmailTicketHtml({ user, tickets, selectedDate, subscriptionPlan }),
-    attachments,
+      const qrImage = await QRCode.toBuffer(qrData);
+
+      return {
+        filename: `smart-garden-ticket-${ticket._id}.png`,
+        content: qrImage,
+        contentType: 'image/png',
+        cid: `qr-${ticket._id}`, // CONTENT ID for inline display
+      };
+    } catch (qrErr) {
+      console.error(`Failed to generate QR for ticket ${ticket._id}:`, qrErr);
+      return null;
+    }
   });
 
-  console.log(`Email successfully sent to ${user.email}. MessageID: ${info.messageId}`);
+  const attachments = (await Promise.all(attachmentPromises)).filter((a) => a !== null);
 
-  return {
-    status: 'sent',
-    messageId: info.messageId,
-    to: user.email,
-  };
+  console.log(
+    `Attempting to send ticket email to ${user.email} with ${attachments.length} inline QR codes...`
+  );
+
+  try {
+    const info = await transporter.sendMail({
+      from: `"Smart Garden" <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: 'Your Smart Garden Ticket Confirmation',
+      html: buildEmailTicketHtml({ user, tickets, selectedDate, subscriptionPlan }),
+      attachments,
+    });
+
+    console.log(`Email successfully sent to ${user.email}. MessageID: ${info.messageId}`);
+    return {
+      status: 'sent',
+      messageId: info.messageId,
+      to: user.email,
+    };
+  } catch (sendError) {
+    console.error('Email failed to send:', sendError);
+    return {
+      status: 'failed',
+      error: 'sendMail failed',
+      details: sendError.message,
+    };
+  }
 };
 
 const checkout = async (req, res) => {
@@ -222,7 +312,7 @@ const checkout = async (req, res) => {
         });
       }
 
-      const selectedDateStr = new Date(selectedDate).toISOString().split('T')[0];
+      const selectedDateStr = formatDateLocal(selectedDate);
       const dayStart = new Date(selectedDate);
       dayStart.setHours(0, 0, 0, 0);
       const dayEnd = new Date(selectedDate);
@@ -331,80 +421,93 @@ const checkout = async (req, res) => {
 
     const savedTickets = await Ticket.insertMany(newTickets);
 
-    const io = req.app.get('io');
-    if (io) {
-      const [totalTicketsSold, purchasingUsersAgg, salesAgg, mostSoldAgg] = await Promise.all([
-        Ticket.countDocuments(),
-        Ticket.aggregate([{ $group: { _id: '$userId' } }, { $count: 'totalPurchasingUsers' }]),
-        Ticket.aggregate([
-          { $match: { status: { $ne: 'cancelled' } } },
-          {
-            $group: {
-              _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
-              totalTickets: { $sum: 1 },
-              revenue: { $sum: '$price' },
-            },
-          },
-          { $sort: { '_id.year': -1, '_id.month': -1 } },
-          { $limit: 12 },
-        ]),
-        Ticket.aggregate([
-          {
-            $group: { _id: { type: '$ticketType', plan: '$subscriptionPlan' }, count: { $sum: 1 } },
-          },
-          { $sort: { count: -1 } },
-          { $limit: 1 },
-        ]),
-      ]);
+    // BACKGROUND TASKS: We fire these off and don't await them so the user gets an immediate response.
+    // Errors are caught internally to prevent the main process from crashing.
+    setImmediate(async () => {
+      try {
+        const io = req.app.get('io');
+        if (io) {
+          const [totalTicketsSold, purchasingUsersAgg, salesAgg, mostSoldAgg] = await Promise.all([
+            Ticket.countDocuments(),
+            Ticket.aggregate([{ $group: { _id: '$userId' } }, { $count: 'totalPurchasingUsers' }]),
+            Ticket.aggregate([
+              { $match: { status: { $ne: 'cancelled' } } },
+              {
+                $group: {
+                  _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
+                  totalTickets: { $sum: 1 },
+                  revenue: { $sum: '$price' },
+                },
+              },
+              { $sort: { '_id.year': -1, '_id.month': -1 } },
+              { $limit: 12 },
+            ]),
+            Ticket.aggregate([
+              {
+                $group: {
+                  _id: { type: '$ticketType', plan: '$subscriptionPlan' },
+                  count: { $sum: 1 },
+                },
+              },
+              { $sort: { count: -1 } },
+              { $limit: 1 },
+            ]),
+          ]);
 
-      const purchasingUsers =
-        purchasingUsersAgg.length > 0 ? purchasingUsersAgg[0].totalPurchasingUsers : 0;
+          const purchasingUsers =
+            purchasingUsersAgg.length > 0 ? purchasingUsersAgg[0].totalPurchasingUsers : 0;
 
-      let mostSoldTicket = 'None yet';
-      if (mostSoldAgg.length > 0) {
-        const top = mostSoldAgg[0];
-        const typeCap = top._id.type
-          ? top._id.type.charAt(0).toUpperCase() + top._id.type.slice(1)
-          : 'Unknown';
-        mostSoldTicket = `${typeCap} (${top._id.plan || 'unknown'})`;
+          let mostSoldTicket = 'None yet';
+          if (mostSoldAgg.length > 0) {
+            const top = mostSoldAgg[0];
+            const typeCap = top._id.type
+              ? top._id.type.charAt(0).toUpperCase() + top._id.type.slice(1)
+              : 'Unknown';
+            mostSoldTicket = `${typeCap} (${top._id.plan || 'unknown'})`;
+          }
+          io.emit('totalTicketsUpdate', { totalTicketsSold, purchasingUsers, mostSoldTicket });
+
+          const formattedSales = salesAgg
+            .map((s) => ({
+              month: new Date(s._id.year, s._id.month - 1).toLocaleString('default', {
+                month: 'short',
+                year: 'numeric',
+              }),
+              totalTickets: s.totalTickets,
+              revenue: s.revenue,
+            }))
+            .reverse();
+          io.emit('monthlySalesUpdate', formattedSales);
+        }
+
+        // NEW: Emit targeted update to the specific user's room for Profile page real-time refresh
+        if (io) {
+          savedTickets.forEach((ticket) => {
+            io.to(`user-${req.user._id}-tickets`).emit('ticketStatusChanged', {
+              ticketId: ticket._id,
+              userId: req.user._id,
+              status: 'active',
+              updatedAt: ticket.createdAt,
+              ticket: ticket,
+            });
+          });
+        }
+
+        // Trigger email in background
+        await sendTicketsViaEmail({
+          user: req.user,
+          tickets: savedTickets,
+          selectedDate,
+          subscriptionPlan,
+        });
+      } catch (bgError) {
+        console.error('Post-Checkout Background Task Error:', bgError);
       }
-      io.emit('totalTicketsUpdate', { totalTicketsSold, purchasingUsers, mostSoldTicket });
-
-      const formattedSales = salesAgg
-        .map((s) => ({
-          month: new Date(s._id.year, s._id.month - 1).toLocaleString('default', {
-            month: 'short',
-            year: 'numeric',
-          }),
-          totalTickets: s.totalTickets,
-          revenue: s.revenue,
-        }))
-        .reverse();
-      io.emit('monthlySalesUpdate', formattedSales);
-    }
-
-    let emailResult = { status: 'skipped', reason: 'Not attempted' };
-
-    try {
-      emailResult = await sendTicketsViaEmail({
-        user: req.user,
-        tickets: savedTickets,
-        selectedDate,
-        subscriptionPlan,
-      });
-      console.log('Email ticket result:', emailResult);
-    } catch (emailError) {
-      emailResult = {
-        status: 'failed',
-        message: emailError.message,
-      };
-      console.error('Email Delivery Error:', emailError);
-    }
+    });
 
     return res.status(200).json({
-      message: 'Checkout successful. Ticket QR code sent to email.',
+      message: 'Checkout successful. Your tickets are being generated and sent to your email.',
       tickets: savedTickets,
-      email: emailResult,
       card: cardResult,
     });
   } catch (error) {
@@ -449,7 +552,7 @@ const getTicketInsights = async (req, res) => {
     for (let i = 0; i < 7; i += 1) {
       const currentDate = new Date(weekStart);
       currentDate.setDate(currentDate.getDate() + i);
-      const dateStr = currentDate.toISOString().split('T')[0];
+      const dateStr = formatDateLocal(currentDate);
       const count = ticketCountMap[dateStr] || 0;
 
       days.push({
@@ -482,15 +585,20 @@ const cancelTicket = async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    if (ticket.status !== 'active') {
-      return res.status(400).json({ message: 'Only active tickets can be cancelled.' });
+    // Requirement: If ticket.status === 'EXPIRED' or if the validUntil date has already passed compared to the start of today
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (ticket.status === 'expired' || ticket.validUntil < todayStart) {
+      if (ticket.status !== 'expired') {
+        ticket.status = 'expired';
+        await ticket.save();
+      }
+      return res.status(400).json({ message: 'Cannot refund expired or past tickets' });
     }
 
-    const now = new Date();
-    if (ticket.validUntil && now > ticket.validUntil) {
-      ticket.status = 'expired';
-      await ticket.save();
-      return res.status(400).json({ message: 'Ticket has already expired.' });
+    if (ticket.status !== 'active') {
+      return res.status(400).json({ message: 'Only active tickets can be cancelled.' });
     }
 
     ticket.status = 'cancelled';
@@ -531,4 +639,94 @@ const cancelTicket = async (req, res) => {
   }
 };
 
-module.exports = { checkout, getTicketHistory, getTicketInsights, cancelTicket };
+const rescheduleTicket = async (req, res) => {
+  try {
+    const { newDate } = req.body;
+    if (!newDate) {
+      return res.status(400).json({ message: 'New date is required' });
+    }
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const maxDate = new Date(today);
+    maxDate.setDate(maxDate.getDate() + 4);
+
+    let checkDate;
+    if (typeof newDate === 'string' && newDate.includes('-')) {
+      const [year, month, day] = newDate.split('-').map(Number);
+      checkDate = new Date(year, month - 1, day);
+    } else {
+      checkDate = new Date(newDate);
+      checkDate.setHours(0, 0, 0, 0);
+    }
+
+    if (checkDate < today || checkDate > maxDate) {
+      return res.status(400).json({
+        message: `You can only reschedule to a date between today and ${maxDate.toLocaleDateString()}.`,
+      });
+    }
+
+    const ticket = await Ticket.findOne({ _id: req.params.id, userId: req.user._id });
+
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    if (ticket.subscriptionPlan !== 'one-time') {
+      return res.status(400).json({ message: 'Only one-time tickets can be rescheduled' });
+    }
+
+    if (ticket.status !== 'active') {
+      return res.status(400).json({ message: 'Only active tickets can be rescheduled' });
+    }
+
+    if (ticket.hasRescheduled) {
+      return res.status(400).json({ message: 'Ticket has already been rescheduled once' });
+    }
+
+    const selectedDateStr = formatDateLocal(newDate);
+    const dayStart = new Date(newDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(newDate);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    const ticketCountMap = await Ticket.countTicketsByDateRange(dayStart.getTime(), dayEnd.getTime());
+    const currentCount = ticketCountMap[selectedDateStr] || 0;
+
+    if (currentCount + 1 > DAILY_CAPACITY) {
+      return res.status(400).json({
+        message: `This date does not have enough capacity. Only ${Math.max(0, DAILY_CAPACITY - currentCount)} left.`,
+      });
+    }
+
+    ticket.validFrom = dayStart;
+    ticket.validUntil = dayEnd;
+    ticket.hasRescheduled = true;
+    await ticket.save();
+
+    // NEW: Emit targeted update to the specific user's room for real-time refresh
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user-${req.user._id}-tickets`).emit('ticketStatusChanged', {
+        ticketId: ticket._id,
+        userId: req.user._id,
+        status: ticket.status,
+        updatedAt: new Date(),
+        ticket: ticket,
+      });
+    }
+
+    res.json({ message: 'Ticket rescheduled successfully', ticket });
+  } catch (error) {
+    console.error('Reschedule Ticket Error:', error);
+    res.status(500).json({ message: 'Server error rescheduling ticket' });
+  }
+};
+
+module.exports = {
+  checkout,
+  getTicketHistory,
+  getTicketInsights,
+  cancelTicket,
+  rescheduleTicket,
+};

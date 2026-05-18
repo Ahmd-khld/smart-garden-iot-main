@@ -35,6 +35,10 @@ const ticketSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    hasRescheduled: {
+      type: Boolean,
+      default: false,
+    },
     scanHistory: [
       {
         type: Date,

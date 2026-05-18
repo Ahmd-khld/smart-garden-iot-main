@@ -61,6 +61,11 @@ const updateUserProfile = async (req, res) => {
       res.status(404).json({ message: 'User not found' });
     }
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: 'This email address is already in use by another account.',
+      });
+    }
     res.status(500).json({ message: error.message });
   }
 };

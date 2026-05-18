@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { useUI } from '../context/UIContext';
 import api from '../api';
+import { socket } from '../socket';
+import RescheduleModal from '../components/RescheduleModal';
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState('info');
@@ -11,6 +13,7 @@ const Profile = () => {
   const [tickets, setTickets] = useState([]);
   const [selectedQrId, setSelectedQrId] = useState(null);
   const [historyFilter, setHistoryFilter] = useState('all');
+  const [reschedulingTicketId, setReschedulingTicketId] = useState(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -42,6 +45,25 @@ const Profile = () => {
         setPhone(data.phone);
         setHasDisability(data.hasDisability);
 
+        // Socket logic
+        socket.connect();
+        socket.emit('joinUserRoom', data._id);
+
+        socket.on('ticketStatusChanged', (payload) => {
+          setTickets((prevTickets) => {
+            const index = prevTickets.findIndex((t) => t._id === payload.ticketId);
+            if (index !== -1) {
+              // Update existing ticket
+              const updated = [...prevTickets];
+              updated[index] = { ...updated[index], ...payload.ticket };
+              return updated;
+            } else {
+              // Add new ticket (e.g. from checkout)
+              return [payload.ticket, ...prevTickets];
+            }
+          });
+        });
+
         // Fetch Tickets
         const ticketsRes = await api.get('/tickets/history', {
           headers: { Authorization: `Bearer ${token}` },
@@ -57,6 +79,13 @@ const Profile = () => {
     };
 
     fetchAllData();
+
+    return () => {
+      if (user?._id) {
+        socket.emit('leaveUserRoom', user._id);
+      }
+      socket.off('ticketStatusChanged');
+    };
   }, [navigate]);
 
   const handleUpdateInfo = async (e) => {
@@ -124,6 +153,10 @@ const Profile = () => {
         'error'
       );
     }
+  };
+
+  const handleRescheduleTicket = (ticketId) => {
+    setReschedulingTicketId(ticketId);
   };
 
   if (!user) {
@@ -381,6 +414,14 @@ const Profile = () => {
                                 >
                                   {selectedQrId === ticket._id ? 'Hide QR' : 'Show QR Code'}
                                 </button>
+                                {ticket.subscriptionPlan === 'one-time' && !ticket.hasRescheduled && (
+                                  <button
+                                    onClick={() => handleRescheduleTicket(ticket._id)}
+                                    className="text-sm bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 font-bold py-1.5 px-4 rounded-lg shadow-sm transition-colors w-full max-w-[140px]"
+                                  >
+                                    Change Date
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleCancelTicket(ticket._id)}
                                   className="text-sm bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 font-bold py-1.5 px-4 rounded-lg shadow-sm transition-colors w-full max-w-[140px]"
@@ -429,7 +470,7 @@ const Profile = () => {
                         <div className="flex justify-between items-center text-sm font-medium text-smart-gray/50 dark:text-gray-500 pt-4 border-t border-gray-100 dark:border-gray-600">
                           <p className="font-mono text-xs">ID: {ticket._id.slice(-8)}</p>
                           <p>
-                            {new Date(ticket.createdAt).toLocaleDateString(undefined, {
+                            {new Date(ticket.validFrom || ticket.createdAt).toLocaleDateString(undefined, {
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric',
@@ -534,6 +575,21 @@ const Profile = () => {
           )}
         </div>
       </div>
+      {reschedulingTicketId && (
+        <RescheduleModal
+          ticketId={reschedulingTicketId}
+          onClose={() => setReschedulingTicketId(null)}
+          onSuccess={(updatedTicket) => {
+            setTickets((prev) => prev.map((t) => (t._id === updatedTicket._id ? updatedTicket : t)));
+            setReschedulingTicketId(null);
+            showModal(
+              'Ticket rescheduled successfully! Your new date has been confirmed.',
+              'Success',
+              'success'
+            );
+          }}
+        />
+      )}
     </div>
   );
 };

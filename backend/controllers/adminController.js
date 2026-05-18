@@ -196,11 +196,24 @@ const scanTicket = async (req, res) => {
       return res.status(200).json({ message: resMsg });
     };
 
-    console.log('Attempting to scan ID:', req.body.ticketId);
-    const { ticketId } = req.body;
+    console.log('Attempting to scan data:', req.body.ticketId);
+    let { ticketId } = req.body;
 
     if (!ticketId) {
       return handleFailure(null, null, 'ticketId is required');
+    }
+
+    // NEW: Handle JSON formatted QR data from email
+    if (typeof ticketId === 'string' && ticketId.startsWith('{')) {
+      try {
+        const parsedData = JSON.parse(ticketId);
+        if (parsedData.ticketId) {
+          ticketId = parsedData.ticketId;
+          console.log('Extracted ticketId from JSON:', ticketId);
+        }
+      } catch (e) {
+        console.error('Failed to parse JSON QR data:', e.message);
+      }
     }
 
     if (!mongoose.Types.ObjectId.isValid(ticketId)) {

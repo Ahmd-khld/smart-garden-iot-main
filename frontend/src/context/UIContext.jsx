@@ -20,6 +20,9 @@ export const UIProvider = ({ children }) => {
     type: 'info', // 'info', 'success', 'error', 'warning', 'prompt'
     isPrompt: false,
     placeholder: '',
+    inputType: 'text',
+    min: '',
+    max: '',
   });
 
   const [confirm, setConfirm] = useState({
@@ -41,20 +44,26 @@ export const UIProvider = ({ children }) => {
     });
   }, []);
 
-  const showPrompt = useCallback((message, title = 'Input Required', placeholder = 'Enter value...') => {
-    setModal({
-      isOpen: true,
-      title,
-      message,
-      type: 'prompt',
-      isPrompt: true,
-      placeholder,
-    });
+  const showPrompt = useCallback(
+    (message, title = 'Input Required', placeholder = 'Enter value...', inputType = 'text', min = '', max = '') => {
+      setModal({
+        isOpen: true,
+        title,
+        message,
+        type: 'prompt',
+        isPrompt: true,
+        placeholder,
+        inputType,
+        min,
+        max,
+      });
 
-    return new Promise((resolve) => {
-      setModalResolver(() => resolve);
-    });
-  }, []);
+      return new Promise((resolve) => {
+        setModalResolver(() => resolve);
+      });
+    },
+    []
+  );
 
   const showConfirm = useCallback((message, title = 'Confirmation') => {
     setConfirm({
@@ -110,6 +119,9 @@ export const UIProvider = ({ children }) => {
         type={modal.type}
         isPrompt={modal.isPrompt}
         placeholder={modal.placeholder}
+        inputType={modal.inputType}
+        min={modal.min}
+        max={modal.max}
         onClose={hideModal}
         onConfirm={handleModalConfirm}
       />

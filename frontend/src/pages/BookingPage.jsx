@@ -56,10 +56,10 @@ const BookingPage = () => {
   const [insightStartDate, setInsightStartDate] = useState(new Date());
   const navigate = useNavigate();
 
-  // Calculate week window (today through today + 6 days)
+  // Calculate week window (today through today + 6 days) using local midnight
   const getWeekWindow = () => {
-    const weekStart = new Date(insightStartDate);
-    weekStart.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
     return { weekStart, weekEnd };
@@ -67,9 +67,16 @@ const BookingPage = () => {
 
   const { weekStart, weekEnd } = getWeekWindow();
 
-  // Format dates for input
-  const minDate = weekStart.toISOString().split('T')[0];
-  const maxDate = weekEnd.toISOString().split('T')[0];
+  // Format dates for input (YYYY-MM-DD)
+  const formatDateForInput = (date) => {
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const minDate = formatDateForInput(weekStart);
+  const maxDate = formatDateForInput(weekEnd);
 
   // Fetch crowd insights
   const fetchInsights = React.useCallback(async () => {
