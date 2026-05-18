@@ -38,12 +38,13 @@ const isTokenExpired = (token) => {
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const { showModal } = useUI();
+  const { showModal, showPrompt, showConfirm } = useUI();
   const [searchParams, setSearchParams] = useSearchParams();
   const [stats, setStats] = useState(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
-  const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'admin@smartpark.com';
-  const isSuperAdmin = localStorage.getItem('adminEmail') === superAdminEmail;
+  const superAdminEmail = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase();
+  const currentAdminEmail = (localStorage.getItem('adminEmail') || '').toLowerCase().trim();
+  const isSuperAdmin = currentAdminEmail === superAdminEmail;
 
   const [regularUsers, setRegularUsers] = useState([]);
   const [subAdmins, setSubAdmins] = useState([]);
@@ -104,6 +105,12 @@ const AdminDashboard = () => {
     const tabFromUrl = searchParams.get('tab');
     if (tabFromUrl && tabFromUrl !== activeTab) {
       setActiveTab(tabFromUrl);
+    }
+
+    // Capture ticketId from URL if present (e.g. from User Tickets View)
+    const ticketIdFromUrl = searchParams.get('ticketId');
+    if (ticketIdFromUrl) {
+      setManualTicketId(ticketIdFromUrl);
     }
   }, [searchParams, activeTab]);
 
@@ -312,7 +319,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchInsights();
-  }, [fetchInsights]);
+  }, [fetchInsights, syncTrigger]);
 
   const fetchStats = async () => {
     const token = localStorage.getItem('token');
@@ -609,12 +616,11 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteUser = async (userId) => {
-    if (
-      !window.confirm(
-        'Are you sure you want to permanently delete this user? This action cannot be undone.'
-      )
-    )
-      return;
+    const isConfirmed = await showConfirm(
+      'Are you sure you want to permanently delete this user? This action cannot be undone.',
+      'Delete User'
+    );
+    if (!isConfirmed) return;
     const token = localStorage.getItem('token');
     if (isTokenExpired(token)) {
       showModal('Your session has expired. Please log in again.', 'Session Expired', 'error');
@@ -640,13 +646,11 @@ const AdminDashboard = () => {
   };
 
   const handleResetOccupancy = async () => {
-    if (
-      !window.confirm(
-        'Are you sure you want to reset the park occupancy? This will archive all currently scanned tickets. This action cannot be undone.'
-      )
-    ) {
-      return;
-    }
+    const isConfirmed = await showConfirm(
+      'Are you sure you want to reset the park occupancy? This will archive all currently scanned tickets. This action cannot be undone.',
+      'Reset Occupancy'
+    );
+    if (!isConfirmed) return;
 
     const token = localStorage.getItem('token');
     try {
@@ -697,13 +701,11 @@ const AdminDashboard = () => {
   };
 
   const handleClearDummyData = async () => {
-    if (
-      !window.confirm(
-        'Are you sure you want to delete all tickets? This will clear all chart data and cannot be undone.'
-      )
-    ) {
-      return;
-    }
+    const isConfirmed = await showConfirm(
+      'Are you sure you want to delete all tickets? This will clear all chart data and cannot be undone.',
+      'Clear Database'
+    );
+    if (!isConfirmed) return;
 
     const token = localStorage.getItem('token');
     try {
@@ -723,7 +725,11 @@ const AdminDashboard = () => {
   };
 
   const handleBackupDatabase = async () => {
-    if (!window.confirm('Are you sure you want to trigger a manual database backup now?')) return;
+    const isConfirmed = await showConfirm(
+      'Are you sure you want to trigger a manual database backup now?',
+      'Database Backup'
+    );
+    if (!isConfirmed) return;
 
     const token = localStorage.getItem('token');
     try {
@@ -751,33 +757,36 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleLoadMoreAuditLogs = async () => {
+  const fetchAuditLogs = async (page = 1, append = false) => {
     setIsLoadingAuditLogs(true);
     const token = localStorage.getItem('token');
     try {
       const response = await api.get('/admin/audit-logs', {
-        params: { page: auditLogPage + 1, limit: 10 },
+        params: { page, limit: 10 },
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = response.data;
-      setAuditLogs((prev) => [...prev, ...data.logs]);
+      if (append) setAuditLogs((prev) => [...prev, ...data.logs]);
+      else setAuditLogs(data.logs || []);
+
       setAuditLogPage(data.currentPage);
       setAuditLogHasMore(data.currentPage < data.totalPages);
     } catch (error) {
-      console.error('Failed to load older audit logs', error);
+      console.error('Failed to fetch audit logs', error);
     } finally {
       setIsLoadingAuditLogs(false);
     }
   };
+
+  const handleLoadMoreAuditLogs = () => fetchAuditLogs(auditLogPage + 1, true);
 
   const handleClearAuditLogs = async (olderThan = null) => {
     const confirmMsg = olderThan
       ? `Are you sure you want to wipe security audit logs older than ${olderThan} days?`
       : 'Are you sure you want to completely wipe the security audit history? This action cannot be undone.';
 
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
+    const isConfirmed = await showConfirm(confirmMsg, 'Clear Audit Logs');
+    if (!isConfirmed) return;
 
     setIsLoadingAuditLogs(true);
     const token = localStorage.getItem('token');
@@ -797,12 +806,11 @@ const AdminDashboard = () => {
   };
 
   const handleClearHardwareAlerts = async () => {
-    if (
-      !window.confirm(
-        'Are you sure you want to completely clear all hardware alerts? This action cannot be undone.'
-      )
-    )
-      return;
+    const isConfirmed = await showConfirm(
+      'Are you sure you want to completely clear all hardware alerts? This action cannot be undone.',
+      'Clear Alerts'
+    );
+    if (!isConfirmed) return;
     const token = localStorage.getItem('token');
     try {
       await api.delete('/admin/hardware-alerts', {
@@ -855,7 +863,8 @@ const AdminDashboard = () => {
   }, [bannedIPsSearchQuery]);
 
   const handleUnbanIP = async (id) => {
-    if (!window.confirm('Are you sure you want to unban this IP address?')) return;
+    const isConfirmed = await showConfirm('Are you sure you want to unban this IP address?', 'Unban IP');
+    if (!isConfirmed) return;
     const token = localStorage.getItem('token');
     try {
       await api.delete(`/admin/banned-ips/${id}`, {
@@ -891,7 +900,11 @@ const AdminDashboard = () => {
   };
 
   const handleRemoveWhitelistIP = async (id) => {
-    if (!window.confirm('Are you sure you want to remove this IP from the whitelist?')) return;
+    const isConfirmed = await showConfirm(
+      'Are you sure you want to remove this IP from the whitelist?',
+      'Remove Whitelist'
+    );
+    if (!isConfirmed) return;
     const token = localStorage.getItem('token');
     try {
       const response = await api.delete(`/admin/whitelisted-ips/${id}`, {
@@ -927,10 +940,11 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteBackup = async (filename) => {
-    if (
-      !window.confirm(`Are you sure you want to permanently delete the backup file: ${filename}?`)
-    )
-      return;
+    const isConfirmed = await showConfirm(
+      `Are you sure you want to permanently delete the backup file: ${filename}?`,
+      'Delete Backup'
+    );
+    if (!isConfirmed) return;
     const token = localStorage.getItem('token');
     try {
       await api.delete(`/admin/backups/${filename}`, {
@@ -945,12 +959,11 @@ const AdminDashboard = () => {
   };
 
   const handleRestoreBackup = async (filename) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to restore the database to the state in ${filename}? This action will overwrite current data and cannot be undone.`
-      )
-    )
-      return;
+    const isConfirmed = await showConfirm(
+      `Are you sure you want to restore the database to the state in ${filename}? This action will overwrite current data and cannot be undone.`,
+      'Restore Backup'
+    );
+    if (!isConfirmed) return;
 
     setRestoringBackupFilename(filename);
     const token = localStorage.getItem('token');
@@ -2351,7 +2364,7 @@ const AdminDashboard = () => {
                         {stats?.currentOccupancy || 0}
                       </span>
                       <span className="text-smart-gray dark:text-gray-500 font-bold text-xs uppercase tracking-widest mt-1">
-                        / 200 Limit
+                        / {stats?.maxCapacity || 1000} Limit
                       </span>
                     </div>
                   )}

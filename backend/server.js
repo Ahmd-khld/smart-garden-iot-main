@@ -25,6 +25,7 @@ const { requireSuperAdmin, requireAdmin } = require('./middleware/superAdminMidd
 const ticketRoutes = require('./routes/ticketRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const userRoutes = require('./routes/userRoutes');
+const authRoutes = require('./routes/authRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const promoRoutes = require('./routes/promoRoutes');
 
@@ -93,26 +94,29 @@ app.use((req, res, next) => {
   next();
 });
 
+const { initTicketCron } = require('./cron/ticketCron');
+
 mongoose
   .connect(process.env.MONGO_URI || 'mongodb://localhost:27017/smart-park')
   .then(() => {
     console.log('MongoDB Connected');
     initAdmin();
+    initTicketCron();
   })
   .catch((err) => console.error('MongoDB connection error:', err));
 
 const initAdmin = async () => {
   try {
-    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com';
+    const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase();
     const adminExists = await User.findOne({ email: superAdminEmail });
     if (!adminExists) {
       const adminPassword = process.env.ADMIN_PASSWORD || 'admin';
-      const hashedPassword = await bcrypt.hash(adminPassword, 12);
+      // Do NOT hash here, User.create will trigger pre-save hook which hashes it
       await User.create({
         name: 'System Administrator',
         email: superAdminEmail,
         phone: 'N/A',
-        password: hashedPassword,
+        password: adminPassword,
         age: 30,
         role: 'admin',
         hasDisability: false,
@@ -142,6 +146,7 @@ const logAdminActionServer = async (req, actionDesc) => {
 };
 
 app.use('/api/users', userRoutes);
+app.use('/api', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/game', gameRoutes);

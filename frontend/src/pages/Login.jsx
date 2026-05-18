@@ -22,7 +22,8 @@ const Login = () => {
       localStorage.setItem('token', data.token);
       localStorage.setItem('role', data.role || 'user');
       if (data.role === 'admin') {
-        localStorage.setItem('adminEmail', email.toLowerCase().trim());
+        const storedEmail = (data.email || email).toLowerCase().trim();
+        localStorage.setItem('adminEmail', storedEmail);
       }
 
       if (data.role === 'admin') {

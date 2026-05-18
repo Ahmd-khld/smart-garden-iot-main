@@ -7,8 +7,23 @@ import logo from '../assets/logo.png';
 const Navbar = ({ darkMode, toggleDarkMode }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const token = localStorage.getItem('token');
-  const role = localStorage.getItem('role');
+
+  // Use state to track auth to ensure re-renders on login/logout
+  // We sync this state whenever the location changes as a simple way to track navigation-based auth changes
+  const [auth, setAuth] = React.useState({
+    token: localStorage.getItem('token'),
+    role: localStorage.getItem('role'),
+  });
+
+  React.useEffect(() => {
+    setAuth({
+      token: localStorage.getItem('token'),
+      role: localStorage.getItem('role'),
+    });
+  }, [location]);
+
+  const { token, role } = auth;
+  const isAuthenticated = token && token !== 'null' && token !== 'undefined';
 
   const isActive = (path) => {
     const isCurrent = location.pathname === path;
@@ -24,6 +39,8 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
+    localStorage.removeItem('adminEmail');
+    setAuth({ token: null, role: null });
     navigate('/');
   };
 
@@ -68,7 +85,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             <ThemeToggle isDarkMode={darkMode} toggleTheme={toggleDarkMode} />
           </div>
 
-          {token && role === 'user' && (
+          {isAuthenticated && role === 'user' && (
             <Link
               to="/profile"
               className={`flex items-center space-x-1 shrink-0 ${isActive('/profile')}`}
@@ -85,7 +102,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             </Link>
           )}
 
-          {token && role === 'user' && (
+          {isAuthenticated && (
             <button
               onClick={handleLogout}
               className="text-white/70 hover:text-white transition-colors ml-2 font-bold uppercase text-xs tracking-widest whitespace-nowrap shrink-0"
@@ -94,7 +111,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             </button>
           )}
 
-          {token && role === 'admin' && (
+          {isAuthenticated && role === 'admin' && (
             <Link
               to="/admin/dashboard"
               className="flex items-center space-x-2 bg-white/10 border border-white/20 hover:bg-white/20 text-smart-glow px-5 py-2.5 rounded-xl font-black transition-all shadow-md transform hover:-translate-y-0.5 ml-4 whitespace-nowrap shrink-0"

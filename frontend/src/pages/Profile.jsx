@@ -6,10 +6,11 @@ import api from '../api';
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState('info');
-  const { showModal } = useUI();
+  const { showModal, showConfirm } = useUI();
   const [user, setUser] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [selectedQrId, setSelectedQrId] = useState(null);
+  const [historyFilter, setHistoryFilter] = useState('all');
 
   // Form states
   const [name, setName] = useState('');
@@ -93,11 +94,11 @@ const Profile = () => {
   };
 
   const handleCancelTicket = async (ticketId) => {
-    if (
-      !window.confirm('Are you sure you want to cancel this ticket? A refund will be initiated.')
-    ) {
-      return;
-    }
+    const isConfirmed = await showConfirm(
+      'Are you sure you want to cancel this ticket? A refund will be initiated.',
+      'Cancel Ticket'
+    );
+    if (!isConfirmed) return;
 
     const token = localStorage.getItem('token');
     try {
@@ -291,12 +292,29 @@ const Profile = () => {
           {/* HISTORY TAB */}
           {activeTab === 'history' && (
             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-10 border border-smart-light/30 dark:border-smart-light/10 animate-fade-in-up">
-              <h2 className="text-3xl font-black text-smart-dark dark:text-white mb-8 flex items-center italic">
-                Purchase History
-              </h2>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <h2 className="text-3xl font-black text-smart-dark dark:text-white flex items-center italic">
+                  Purchase History
+                </h2>
+                <div className="flex bg-smart-bg dark:bg-gray-700 p-1 rounded-xl border border-smart-light/10 overflow-x-auto scrollbar-hide max-w-full">
+                  {['all', 'active', 'used', 'expired'].map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setHistoryFilter(status)}
+                      className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                        historyFilter === status
+                          ? 'bg-smart-light text-white shadow-sm'
+                          : 'text-smart-gray dark:text-gray-400 hover:text-smart-dark dark:hover:text-white'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               <div className="space-y-6">
-                {tickets.length === 0 ? (
+                {tickets.filter(t => historyFilter === 'all' || t.status === historyFilter).length === 0 ? (
                   <div className="p-12 text-center border-2 border-dashed border-smart-light/20 rounded-3xl bg-smart-bg dark:bg-gray-700">
                     <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-smart-light/10 shadow-sm">
                       <svg
@@ -314,12 +332,14 @@ const Profile = () => {
                       </svg>
                     </div>
                     <p className="text-smart-gray dark:text-gray-400 font-bold text-lg">
-                      You haven't purchased any tickets yet.
+                      No {historyFilter !== 'all' ? historyFilter : ''} tickets found.
                     </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                    {tickets.map((ticket) => (
+                    {tickets
+                      .filter((t) => historyFilter === 'all' || t.status === historyFilter)
+                      .map((ticket) => (
                       <div
                         key={ticket._id}
                         className="bg-white dark:bg-gray-700 rounded-3xl shadow-md border border-smart-light/20 p-8 hover:shadow-lg transition-shadow flex flex-col justify-between"

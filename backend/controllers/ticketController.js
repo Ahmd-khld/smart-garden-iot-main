@@ -6,7 +6,7 @@ const PromoCode = require('../models/PromoCode');
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '12345678901234567890123456789012';
 const IV_LENGTH = 16;
-const DAILY_CAPACITY = parseInt(process.env.DAILY_CAPACITY) || 200;
+const DAILY_CAPACITY = parseInt(process.env.DAILY_CAPACITY) || 1000;
 
 const isDateValidForBooking = (date) => {
   const today = new Date();

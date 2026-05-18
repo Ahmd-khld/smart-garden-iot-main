@@ -108,7 +108,7 @@ const BookingPage = () => {
 
   const totalTickets = tickets.child + tickets.adult + tickets.senior;
 
-  const dailyCapacity = parseInt(import.meta.env.VITE_DAILY_CAPACITY) || 200;
+  const dailyCapacity = parseInt(import.meta.env.VITE_DAILY_CAPACITY) || 1000;
 
   const handleIncrement = (type) => {
     // Dynamically calculate actual remaining capacity for the selected date

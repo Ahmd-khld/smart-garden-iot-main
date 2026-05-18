@@ -30,15 +30,16 @@ const isTokenExpired = (token) => {
 };
 
 const AdminHardwareAlerts = () => {
-  const { showModal } = useUI();
+  const { showModal, showConfirm } = useUI();
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalAlertsCount, setTotalAlertsCount] = useState(0);
-  const superAdminEmail = import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'admin@smartpark.com';
-  const isSuperAdmin = localStorage.getItem('adminEmail') === superAdminEmail;
+  const superAdminEmail = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase();
+  const currentAdminEmail = (localStorage.getItem('adminEmail') || '').toLowerCase().trim();
+  const isSuperAdmin = currentAdminEmail === superAdminEmail;
 
   const [filterDate, setFilterDate] = useState('');
   const [unreadAuditCount, setUnreadAuditCount] = useState(0);
@@ -177,12 +178,14 @@ const AdminHardwareAlerts = () => {
     };
   }, [fetchAlerts]);
 
-  const handleClearAlerts = async (olderThan = null) => {
+  const handleClearHardwareAlerts = async (olderThan = null) => {
     const confirmMsg = olderThan
       ? `Are you sure you want to wipe hardware alerts older than ${olderThan} days?`
       : 'Are you sure you want to completely wipe the hardware alert history? This action cannot be undone.';
 
-    if (!window.confirm(confirmMsg)) return;
+    const isConfirmed = await showConfirm(confirmMsg, 'Clear Alerts');
+    if (!isConfirmed) return;
+
 
     try {
       const params = {};

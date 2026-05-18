@@ -13,7 +13,7 @@ const AdminUserTickets = () => {
   const [tickets, setTickets] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [scanningId, setScanningId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const fetchTickets = useCallback(async () => {
     if (!userId) return;
@@ -57,8 +57,22 @@ const AdminUserTickets = () => {
     }
 
     // 2. Real-Time Socket Listener
+    const onTicketStatusChanged = (data) => {
+      console.log('⚡ Real-time update: Ticket status changed:', data);
+      setTickets((prev) =>
+        prev.map((t) =>
+          t._id === data.ticketId
+            ? { ...t, status: data.status, updatedAt: data.updatedAt, ...data.ticket }
+            : t
+        )
+      );
+    };
+
+    socket.on('ticketStatusChanged', onTicketStatusChanged);
+
+    // Keep legacy listener for backward compatibility if needed
     const onTicketScanned = (data) => {
-      console.log('⚡ Real-time update: Ticket scanned:', data);
+      console.log('⚡ Real-time legacy update: Ticket scanned:', data);
       setTickets((prev) =>
         prev.map((t) => (t._id === data.ticketId ? { ...t, status: data.status, updatedAt: data.updatedAt } : t))
       );
@@ -86,31 +100,25 @@ const AdminUserTickets = () => {
     // 3. Cleanup: Leave Room & Remove Listener
     return () => {
       socket.emit('leaveUserRoom', userId);
+      socket.off('ticketStatusChanged', onTicketStatusChanged);
       socket.off('ticketScanned', onTicketScanned);
       socket.off('newTicketsPurchased', onNewTickets);
       socket.off('dataRefresh', onDataRefresh);
     };
   }, [userId, fetchTickets]);
 
-  const handleManualScan = async (ticketId) => {
-    try {
-      setScanningId(ticketId);
-      const token = localStorage.getItem('token');
-      await api.post(`/admin/users/${userId}/tickets/${ticketId}/scan`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Note: The UI will be updated via the Socket listener automatically!
-    } catch (error) {
-      console.error('Manual Scan Error:', error);
-      showModal(
-        error.response?.data?.message || 'Failed to scan ticket.',
-        'Scan Error',
-        'error'
-      );
-    } finally {
-      setScanningId(null);
-    }
+  const handleScanAndExpireNavigation = (ticketId) => {
+    // Navigate to the Hardware tab and pass the ticketId as a query parameter
+    navigate(`/admin/dashboard?tab=hardware&ticketId=${ticketId}`);
   };
+
+  const filteredTickets = tickets.filter((t) => {
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'active') return t.status === 'active';
+    if (statusFilter === 'used') return t.status === 'used';
+    if (statusFilter === 'expired') return t.status === 'expired';
+    return true;
+  });
 
   if (loading) {
     return (
@@ -181,9 +189,26 @@ const AdminUserTickets = () => {
           </div>
         </div>
 
+        {/* Status Filter Bar */}
+        <div className="mb-8 flex flex-wrap items-center gap-3">
+          {['all', 'active', 'used', 'expired'].map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setStatusFilter(filter)}
+              className={`px-6 py-2.5 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all transform active:scale-95 ${
+                statusFilter === filter
+                  ? 'bg-smart-light text-white shadow-lg shadow-smart-light/20 -translate-y-1'
+                  : 'bg-white dark:bg-gray-800 text-smart-gray dark:text-gray-400 border border-smart-light/10 hover:border-smart-light/30'
+              }`}
+            >
+              {filter}
+            </button>
+          ))}
+        </div>
+
         {/* Tickets Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tickets.map((ticket) => (
+          {filteredTickets.map((ticket) => (
             <div
               key={ticket._id}
               className={`relative overflow-hidden rounded-[35px] border-2 transition-all duration-500 shadow-xl ${
@@ -251,11 +276,10 @@ const AdminUserTickets = () => {
 
                 {ticket.status === 'active' ? (
                   <button
-                    onClick={() => handleManualScan(ticket._id)}
-                    disabled={scanningId === ticket._id}
+                    onClick={() => handleScanAndExpireNavigation(ticket._id)}
                     className="w-full py-4 bg-smart-dark text-white rounded-2xl font-black uppercase tracking-[0.2em] italic text-xs hover:bg-black transition-all transform hover:-translate-y-1 active:scale-95 shadow-lg shadow-black/20"
                   >
-                    {scanningId === ticket._id ? 'Processing...' : 'Scan & Expire'}
+                    Scan & Expire
                   </button>
                 ) : (
                   <div className="w-full py-4 bg-gray-100 dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-700 text-gray-400 dark:text-gray-600 rounded-2xl font-black uppercase tracking-[0.2em] italic text-xs text-center">

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import CustomModal from '../components/CustomModal';
+import ConfirmModal from '../components/ConfirmModal';
 
 const UIContext = createContext();
 
@@ -21,7 +22,14 @@ export const UIProvider = ({ children }) => {
     placeholder: '',
   });
 
-  const [resolver, setResolver] = useState(null);
+  const [confirm, setConfirm] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+  });
+
+  const [modalResolver, setModalResolver] = useState(null);
+  const [confirmResolver, setConfirmResolver] = useState(null);
 
   const showModal = useCallback((message, title = 'Notification', type = 'info') => {
     setModal({
@@ -44,28 +52,56 @@ export const UIProvider = ({ children }) => {
     });
 
     return new Promise((resolve) => {
-      setResolver(() => resolve);
+      setModalResolver(() => resolve);
+    });
+  }, []);
+
+  const showConfirm = useCallback((message, title = 'Confirmation') => {
+    setConfirm({
+      isOpen: true,
+      title,
+      message,
+    });
+
+    return new Promise((resolve) => {
+      setConfirmResolver(() => resolve);
     });
   }, []);
 
   const hideModal = useCallback(() => {
     setModal((prev) => ({ ...prev, isOpen: false }));
-    if (resolver) {
-      resolver(null);
-      setResolver(null);
+    if (modalResolver) {
+      modalResolver(null);
+      setModalResolver(null);
     }
-  }, [resolver]);
+  }, [modalResolver]);
 
-  const handleConfirm = useCallback((value) => {
+  const handleModalConfirm = useCallback((value) => {
     setModal((prev) => ({ ...prev, isOpen: false }));
-    if (resolver) {
-      resolver(value);
-      setResolver(null);
+    if (modalResolver) {
+      modalResolver(value);
+      setModalResolver(null);
     }
-  }, [resolver]);
+  }, [modalResolver]);
+
+  const handleConfirmCancel = useCallback(() => {
+    setConfirm((prev) => ({ ...prev, isOpen: false }));
+    if (confirmResolver) {
+      confirmResolver(false);
+      setConfirmResolver(null);
+    }
+  }, [confirmResolver]);
+
+  const handleConfirmOK = useCallback(() => {
+    setConfirm((prev) => ({ ...prev, isOpen: false }));
+    if (confirmResolver) {
+      confirmResolver(true);
+      setConfirmResolver(null);
+    }
+  }, [confirmResolver]);
 
   return (
-    <UIContext.Provider value={{ showModal, showPrompt, hideModal }}>
+    <UIContext.Provider value={{ showModal, showPrompt, showConfirm, hideModal }}>
       {children}
       <CustomModal
         isOpen={modal.isOpen}
@@ -75,7 +111,14 @@ export const UIProvider = ({ children }) => {
         isPrompt={modal.isPrompt}
         placeholder={modal.placeholder}
         onClose={hideModal}
-        onConfirm={handleConfirm}
+        onConfirm={handleModalConfirm}
+      />
+      <ConfirmModal
+        isOpen={confirm.isOpen}
+        title={confirm.title}
+        message={confirm.message}
+        onCancel={handleConfirmCancel}
+        onConfirm={handleConfirmOK}
       />
     </UIContext.Provider>
   );

@@ -13,9 +13,9 @@ const fs = require('fs');
 
 const failedScans = new Map(); // Track failed scan attempts to prevent brute force
 
-const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com';
+const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase();
 
-const isSuperAdmin = (req) => req.user && req.user.email === superAdminEmail;
+const isSuperAdmin = (req) => req.user && req.user.email.toLowerCase() === superAdminEmail;
 
 const logAdminAction = async (req, actionDesc) => {
   try {
@@ -47,9 +47,31 @@ const broadcastOccupancy = async (req) => {
     status: 'used',
     updatedAt: { $gte: startOfDay, $lte: endOfDay },
   });
-  const dailyCapacity = parseInt(process.env.DAILY_CAPACITY) || 200;
+  const dailyCapacity = parseInt(process.env.DAILY_CAPACITY) || 1000;
   const capacityPercentage = Math.round((currentOccupancy / dailyCapacity) * 100);
   io.emit('occupancyUpdate', { currentOccupancy, capacityPercentage });
+};
+
+// Helper to broadcast ticket status changes in real-time
+const broadcastTicketStatus = (req, ticket) => {
+  const io = req.app.get('io');
+  if (!io) return;
+
+  const payload = {
+    ticketId: ticket._id,
+    userId: ticket.userId,
+    status: ticket.status,
+    updatedAt: ticket.updatedAt,
+    ticket: ticket, // Send full object for instant frontend updates
+  };
+
+  // 1. Emit to the specific user room (e.g. for User Tickets View)
+  io.to(`user-${ticket.userId}-tickets`).emit('ticketStatusChanged', payload);
+  // Keep legacy event for backward compatibility
+  io.to(`user-${ticket.userId}-tickets`).emit('ticketScanned', payload);
+
+  // 2. Global broadcast for admin monitoring if needed
+  io.emit('globalTicketUpdate', payload);
 };
 
 // Helper to save and broadcast hardware alerts from the Gate Scanner
@@ -111,7 +133,7 @@ const getAdminStats = async (req, res) => {
     // Extract the counted value from the aggregation array safely
     const purchasingUsers =
       purchasingUsersAgg.length > 0 ? purchasingUsersAgg[0].totalPurchasingUsers : 0;
-    const maxCapacity = parseInt(process.env.DAILY_CAPACITY) || 200;
+    const maxCapacity = parseInt(process.env.DAILY_CAPACITY) || 1000;
     const capacityPercentage = Math.round((currentOccupancy / maxCapacity) * 100);
 
     res.status(200).json({
@@ -121,6 +143,7 @@ const getAdminStats = async (req, res) => {
       purchasingUsers,
       currentOccupancy: currentOccupancy,
       capacityPercentage: capacityPercentage,
+      maxCapacity: maxCapacity, // Explicitly include capacity for frontend use
     });
   } catch (error) {
     console.error('Admin Stats Error:', error);
@@ -265,6 +288,7 @@ const scanTicket = async (req, res) => {
         await ticket.save();
 
         await broadcastOccupancy(req);
+        broadcastTicketStatus(req, ticket); // Add real-time broadcast
 
         return handleSuccess(
           'Ticket scanned successfully. Access granted.',
@@ -352,11 +376,6 @@ const getUsers = async (req, res) => {
       ticketCount: countMap[u._id.toString()] || 0,
     }));
 
-    console.log(`[AdminView] getUsers: page ${page}, total ${total}, users returned ${users.length}`);
-    if (users.length > 0) {
-      console.log(`[AdminView] Sample User: ${users[0].name} (ID: ${users[0]._id})`);
-    }
-
     res.status(200).json({
       users,
       totalUsers: total,
@@ -377,10 +396,6 @@ const getUserTickets = async (req, res) => {
     const { userId: rawUserId } = req.params;
     const userId = (rawUserId || '').trim();
 
-    console.log(`[AdminUltraHammer] --- STARTING DEEP DIAGNOSTIC ---`);
-    console.log(`[AdminUltraHammer] DB Name: ${mongoose.connection.name}`);
-    console.log(`[AdminUltraHammer] Input ID: "${userId}"`);
-
     // 1. Resolve the User
     let targetUser = await User.findById(userId).lean();
     if (!targetUser) {
@@ -388,20 +403,10 @@ const getUserTickets = async (req, res) => {
     }
 
     if (!targetUser) {
-      console.log(`[AdminUltraHammer] CRITICAL: User ${userId} not found in DB.`);
-      // Total count for context
-      const totalUsers = await User.countDocuments();
-      return res.status(404).json({ message: `User not found. (Total users in DB: ${totalUsers})` });
+      return res.status(404).json({ message: 'User not found.' });
     }
 
-    console.log(`[AdminUltraHammer] Target User Found: ${targetUser.name} (${targetUser.email})`);
-
-    // 2. Ultra-Hammer Ticket Search
-    // We look by:
-    // a) The provided ID as ObjectId
-    // b) The provided ID as String
-    // c) Every single User ID associated with this Email (the "Ghost Account" check)
-    
+    // 2. Ticket Search
     const possibleOwnerIds = [targetUser._id];
     const siblingUsers = await User.find({ email: targetUser.email }).select('_id').lean();
     siblingUsers.forEach(u => {
@@ -410,17 +415,9 @@ const getUserTickets = async (req, res) => {
       }
     });
 
-    console.log(`[AdminUltraHammer] Searching tickets for ${possibleOwnerIds.length} ID variants...`);
-    
     const tickets = await Ticket.find({
       userId: { $in: [...possibleOwnerIds, userId] }
     }).sort({ createdAt: -1 }).lean();
-
-    console.log(`[AdminUltraHammer] SUCCESS: Found ${tickets.length} tickets.`);
-
-    // 3. Global DB Count for Sanity
-    const totalTicketsInDb = await Ticket.countDocuments();
-    console.log(`[AdminUltraHammer] Sanity: Total tickets in whole DB: ${totalTicketsInDb}`);
 
     res.status(200).json({
       user: {
@@ -428,13 +425,10 @@ const getUserTickets = async (req, res) => {
         name: targetUser.name,
         email: targetUser.email,
         role: targetUser.role,
-        diag_db: mongoose.connection.name,
-        diag_totalTickets: totalTicketsInDb
       },
       tickets: tickets || [],
     });
   } catch (error) {
-    console.error('[AdminUltraHammer] FATAL ERROR:', error);
     res.status(500).json({ message: 'Server error retrieving user tickets', error: error.message });
   }
 };
@@ -1139,15 +1133,42 @@ const deleteBackup = async (req, res) => {
 // @access  Private (Super Admin)
 const generateMockData = async (req, res) => {
   try {
-    console.log('[MockDataHammer] Starting deep diagnostic seeding...');
+    // 0. PARAMETERIZED SCALE CONFIGURATION
+    const dailyCapacity = parseInt(process.env.DAILY_CAPACITY) || 1000;
+    
+    const SCALE = {
+      multiplier: 1.0,           // Adjust this to scale everything (e.g., 2.0 doubles volume)
+      baseUserCount: Math.floor(dailyCapacity * 0.4), // Scale users relative to capacity
+      adminCount: 10,            // Number of sub-admins
+      historicalMonths: 12,      // How many months back to spread history
+      ticketsPerMonth: Math.floor(dailyCapacity * 0.12), // Historical volume
+      ticketsPerDayWeek: Math.floor(dailyCapacity * 0.35), // Scale current week volume to ~35% of capacity
+      occupancyRate: 0.8,        // 80% of today's tickets will be 'used' (Occupancy)
+      alertCount: 40,            // Hardware alerts
+      auditCount: 60,            // Security audit logs
+    };
 
-    // 1. CLEAR SLATE
+    const targetUserCount = Math.floor(SCALE.baseUserCount * SCALE.multiplier);
+    const targetHistoryTickets = Math.floor(SCALE.ticketsPerMonth * SCALE.historicalMonths * SCALE.multiplier);
+    const targetWeekTickets = Math.floor(SCALE.ticketsPerDayWeek * 7 * SCALE.multiplier);
+
+    console.log(`[MockDataHammer] Starting scaled seeding (${SCALE.multiplier}x)...`);
+
+    // 1. CLEAR SLATE (Only for mock data to avoid destroying real data)
     try {
       await User.deleteMany({ email: /mockuser.*@example\.com/ });
-      console.log('[MockDataHammer] Step 1: Cleared mock users.');
+      await Ticket.deleteMany({
+        userId: { $nin: await User.find({ email: { $not: /mockuser.*@example\.com/ } }).select('_id') },
+      });
+      await HardwareAlert.deleteMany({ message: /Simulation alert/ });
+      await AdminAuditLog.deleteMany({ email: /mockuser.*@example\.com/ });
+      await BannedIP.deleteMany({ reason: /Simulation/ });
+      await WhitelistedIP.deleteMany({ description: /Simulation/ });
+      await PromoCode.deleteMany({ code: /MOCK/ });
+
+      console.log('[MockDataHammer] Step 1: Cleared existing simulation data.');
     } catch (e) {
       console.error('[MockDataHammer] FAILED Step 1 (Clear):', e.message);
-      throw new Error(`User deletion failed: ${e.message}`);
     }
 
     // 2. GENERATE USERS
@@ -1155,65 +1176,58 @@ const generateMockData = async (req, res) => {
       'James Smith', 'Maria Garcia', 'Robert Johnson', 'Maria Rodriguez', 'David Smith',
       'Mary Smith', 'Maria Hernandez', 'Maria Martinez', 'James Johnson', 'Robert Smith',
       'Michael Smith', 'Maria Lopez', 'David Johnson', 'Mary Johnson', 'William Smith',
-      'Maria Gonzalez', 'Michael Johnson', 'James Williams', 'Mary Garcia', 'Maria Perez'
+      'Maria Gonzalez', 'Michael Johnson', 'James Williams', 'Mary Garcia', 'Maria Perez',
     ];
-    const roles = ['user', 'user', 'user', 'user', 'admin'];
-    const statuses = [false, false, false, true];
     const hashedPassword = await bcrypt.hash('password123', 12);
-    
+
     const userDocs = [];
-    for (let i = 0; i < 50; i++) {
+    const totalUsersToCreate = targetUserCount + SCALE.adminCount;
+    for (let i = 0; i < totalUsersToCreate; i++) {
+      const isLastFew = i >= targetUserCount;
       userDocs.push({
-        name: names[Math.floor(Math.random() * names.length)] + ' ' + (i + 1),
+        name: names[i % names.length] + ' ' + (i + 1),
         email: `mockuser${i + 1}@example.com`,
         phone: `01${Math.floor(Math.random() * 900000000 + 100000000)}`,
         password: hashedPassword,
         age: Math.floor(Math.random() * 60 + 18),
-        role: roles[Math.floor(Math.random() * roles.length)],
-        isBlocked: statuses[Math.floor(Math.random() * statuses.length)],
+        role: isLastFew ? 'admin' : 'user',
+        isBlocked: !isLastFew && Math.random() > 0.95,
         hasDisability: Math.random() > 0.9,
       });
     }
 
-    let savedUsers;
-    try {
-      savedUsers = await User.insertMany(userDocs);
-      console.log(`[MockDataHammer] Step 2: Created ${savedUsers.length} users.`);
-    } catch (e) {
-      console.error('[MockDataHammer] FAILED Step 2 (Insert Users):', e.message);
-      throw new Error(`User insertion failed: ${e.message}`);
-    }
-
-    const regularUsers = savedUsers.filter(u => u.role === 'user');
+    const savedUsers = await User.insertMany(userDocs);
+    const regularUsers = savedUsers.filter((u) => u.role === 'user');
+    const adminUsers = savedUsers.filter((u) => u.role === 'admin');
+    console.log(`[MockDataHammer] Step 2: Created ${savedUsers.length} users.`);
 
     // 3. GENERATE TICKETS
     const ticketTypes = ['child', 'adult', 'senior'];
     const plans = ['one-time', 'monthly'];
     const ticketStatuses = ['active', 'used', 'expired', 'cancelled'];
     const ticketPrices = { child: 100, adult: 200, senior: 150 };
-    
-    const ticketDocs = [];
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
 
-    for (const user of regularUsers) {
-      const count = Math.floor(Math.random() * 5 + 1);
-      for (let j = 0; j < count; j++) {
+    const ticketDocs = [];
+    const now = new Date();
+
+    // Task A: Historical Spread
+    for (let m = 0; m < SCALE.historicalMonths; m++) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - m, 15);
+      const ticketsInMonth = Math.floor(SCALE.ticketsPerMonth * SCALE.multiplier);
+
+      for (let t = 0; t < ticketsInMonth; t++) {
+        const user = regularUsers[Math.floor(Math.random() * regularUsers.length)];
         const plan = plans[Math.floor(Math.random() * plans.length)];
         const status = ticketStatuses[Math.floor(Math.random() * ticketStatuses.length)];
         const type = ticketTypes[Math.floor(Math.random() * ticketTypes.length)];
-        
-        let validFrom = new Date(today);
-        let validUntil = new Date(today);
 
-        if (status === 'expired') {
-          validFrom.setDate(today.getDate() - 10);
-          validUntil.setDate(today.getDate() - 9);
-        } else if (plan === 'monthly') {
-          validFrom.setDate(today.getDate() - 5);
+        let validFrom = new Date(monthDate);
+        validFrom.setDate(Math.floor(Math.random() * 28) + 1);
+        let validUntil = new Date(validFrom);
+
+        if (plan === 'monthly') {
           validUntil.setDate(validFrom.getDate() + 30);
         } else {
-          validFrom.setDate(today.getDate());
           validUntil.setHours(23, 59, 59, 999);
         }
 
@@ -1226,41 +1240,132 @@ const generateMockData = async (req, res) => {
           validFrom,
           validUntil,
           createdAt: new Date(validFrom),
+          updatedAt: new Date(validFrom), // Logical historical timestamps
+        });
+      }
+    }
+
+    // Task B: Current Week Cluster (High Volume)
+    for (let d = 0; d < 7; d++) {
+      const ticketsInDay = Math.floor(SCALE.ticketsPerDayWeek * SCALE.multiplier);
+      
+      for (let i = 0; i < ticketsInDay; i++) {
+        const user = regularUsers[Math.floor(Math.random() * regularUsers.length)];
+        const type = ticketTypes[Math.floor(Math.random() * ticketTypes.length)];
+        
+        const validFrom = new Date();
+        validFrom.setDate(validFrom.getDate() + d);
+        validFrom.setHours(0, 0, 0, 0);
+        
+        const validUntil = new Date(validFrom);
+        validUntil.setHours(23, 59, 59, 999);
+
+        // Logical occupancy for today vs future
+        let currentStatus = 'active';
+        if (d === 0) {
+          // Today: Apply high occupancy rate to simulate "busy" dashboard
+          if (Math.random() < SCALE.occupancyRate) {
+            currentStatus = 'used'; 
+          }
+        } else {
+          // Future: Some may already be cancelled or used (if simulated scan history existed)
+          if (Math.random() > 0.9) currentStatus = 'cancelled';
+        }
+
+        ticketDocs.push({
+          userId: user._id,
+          ticketType: type,
+          subscriptionPlan: 'one-time',
+          price: ticketPrices[type],
+          status: currentStatus,
+          validFrom,
+          validUntil,
+          createdAt: new Date(),
           updatedAt: new Date(),
         });
       }
     }
 
-    let savedTickets;
-    try {
-      savedTickets = await Ticket.insertMany(ticketDocs, { timestamps: false });
-      console.log(`[MockDataHammer] Step 3: Created ${savedTickets.length} tickets.`);
-    } catch (e) {
-      console.error('[MockDataHammer] FAILED Step 3 (Insert Tickets):', e.message);
-      throw new Error(`Ticket insertion failed: ${e.message}`);
-    }
+    const savedTickets = await Ticket.insertMany(ticketDocs, { timestamps: false });
+    console.log(`[MockDataHammer] Step 3: Created ${savedTickets.length} tickets total.`);
 
     // 4. GENERATE HARDWARE ALERTS
-    try {
-      const alertDocs = [];
-      for (let l = 0; l < 10; l++) {
-        alertDocs.push({
-          message: 'Simulation alert ' + (l + 1),
-          type: 'info',
-          timeString: new Date().toLocaleTimeString(),
-        });
-      }
-      await HardwareAlert.insertMany(alertDocs);
-      console.log('[MockDataHammer] Step 4: Created alerts.');
-    } catch (e) {
-      console.error('[MockDataHammer] FAILED Step 4 (Alerts):', e.message);
-      throw new Error(`Alert insertion failed: ${e.message}`);
+    const alertTemplates = [
+      { message: 'Simulation alert: Zone C moisture drop', type: 'warning' },
+      { message: 'Simulation alert: West Gate deployment', type: 'info' },
+      { message: 'Simulation alert: Smart Bin full', type: 'warning' },
+      { message: 'Simulation alert: Irrigation complete', type: 'success' },
+      { message: 'Simulation alert: Critical hardware error', type: 'error' },
+    ];
+    const alertDocs = [];
+    const totalAlerts = Math.floor(SCALE.alertCount * SCALE.multiplier);
+    for (let l = 0; l < totalAlerts; l++) {
+      const tpl = alertTemplates[l % alertTemplates.length];
+      alertDocs.push({
+        message: tpl.message + ' #' + (l + 1),
+        type: tpl.type,
+        timeString: new Date().toLocaleTimeString(),
+      });
     }
+    await HardwareAlert.insertMany(alertDocs);
+    console.log(`[MockDataHammer] Step 4: Created ${alertDocs.length} hardware alerts.`);
 
-    res.status(200).json({ 
-      message: `Successfully seeded simulation data! ${savedUsers.length} users and ${savedTickets.length} tickets created.`
+    // 5. GENERATE ADMIN AUDIT LOGS
+    const auditDocs = [];
+    const actions = [
+      'Scanned ticket',
+      'Blocked user',
+      'Created sub-admin',
+      'Cleared occupancy',
+      'Downloaded backup',
+      'Updated system settings',
+    ];
+    const totalAudits = Math.floor(SCALE.auditCount * SCALE.multiplier);
+    for (let a = 0; a < totalAudits; a++) {
+      const admin = adminUsers[Math.floor(Math.random() * adminUsers.length)];
+      auditDocs.push({
+        email: admin?.email || 'system@smartpark.com',
+        ipAddress: `192.168.1.${100 + (a % 150)}`,
+        status: Math.random() > 0.1 ? 'success' : 'failed',
+        statusCode: Math.random() > 0.1 ? 200 : 403,
+        action: actions[Math.floor(Math.random() * actions.length)],
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        createdAt: new Date(now.getTime() - Math.random() * 1000000000),
+      });
+    }
+    await AdminAuditLog.insertMany(auditDocs);
+    console.log(`[MockDataHammer] Step 5: Created ${auditDocs.length} audit logs.`);
+
+    // 6. GENERATE BANNED & WHITELISTED IPS
+    const bannedDocs = [];
+    const whitelistDocs = [];
+    for (let i = 0; i < 15; i++) {
+      bannedDocs.push({
+        ipAddress: `10.0.0.${10 + i}`,
+        reason: 'Simulation: Brute force attempt',
+      });
+      whitelistDocs.push({
+        ipAddress: `172.16.0.${50 + i}`,
+        description: 'Simulation: Remote Office IP',
+        macAddress: `00:1A:2B:3C:4D:${i.toString(16).padStart(2, '0')}`,
+      });
+    }
+    await BannedIP.insertMany(bannedDocs);
+    await WhitelistedIP.insertMany(whitelistDocs);
+    console.log('[MockDataHammer] Step 6: Created banned and whitelisted IPs.');
+
+    // 7. Trigger Global Refresh
+    const io = req.app.get('io');
+    if (io) io.emit('dataRefresh');
+
+    res.status(200).json({
+      message: `Scalable simulation seeding complete! (${SCALE.multiplier}x)
+      - Users: ${savedUsers.length}
+      - Tickets: ${savedTickets.length} (History + 7-Day Cluster)
+      - Hardware Alerts: ${alertDocs.length}
+      - Audit Logs: ${auditDocs.length}
+      - IP Security: ${bannedDocs.length} Banned / ${whitelistDocs.length} Whitelisted`,
     });
-
   } catch (error) {
     console.error('[MockDataHammer] CRITICAL ERROR:', error.message);
     res.status(500).json({ message: 'Failed to generate mock data', error: error.message });

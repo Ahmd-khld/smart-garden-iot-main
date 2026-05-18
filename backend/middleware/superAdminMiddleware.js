@@ -37,8 +37,8 @@ const requireSuperAdmin = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id || decoded._id || decoded.userId);
 
-    const superAdminEmail = process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com';
-    if (!user || user.role !== 'admin' || user.email !== superAdminEmail) {
+    const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase();
+    if (!user || user.role !== 'admin' || user.email.toLowerCase() !== superAdminEmail) {
       // If a legitimate sub-admin tries to access a super-admin route, log the attempt
       if (user && user.role === 'admin') {
         try {

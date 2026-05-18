@@ -36,7 +36,8 @@ const LandingPage = () => {
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('role', data.role || 'user');
-      localStorage.setItem('adminEmail', isLogin ? email : data.email);
+      const storedEmail = (isLogin ? email : data.email || email).toLowerCase().trim();
+      localStorage.setItem('adminEmail', storedEmail);
 
       if (data.role === 'admin') {
         navigate('/admin/dashboard');

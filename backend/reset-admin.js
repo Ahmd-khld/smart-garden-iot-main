@@ -23,7 +23,7 @@ const resetSuperAdmin = async () => {
         name: 'System Administrator',
         email: email,
         phone: 'N/A',
-        password: hashedPassword,
+        password: password, // Use raw password, User.create will hash it
         age: 30,
         role: 'admin',
         hasDisability: false,
