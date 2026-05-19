@@ -380,8 +380,17 @@ const getUsers = async (req, res) => {
       ];
     }
 
-    if (status === 'active') query.isBlocked = false;
-    if (status === 'blocked') query.isBlocked = true;
+    if (status) {
+      const s = status.toLowerCase();
+      if (s === 'active') {
+        query.isBlocked = false;
+        query.isRestricted = false;
+      } else if (s === 'blocked') {
+        query.isBlocked = true;
+      } else if (s === 'restricted') {
+        query.isRestricted = true;
+      }
+    }
 
     if (role === 'admin') {
       const admins = await User.find(query)
@@ -527,6 +536,53 @@ const scanUserTicket = async (req, res) => {
   } catch (error) {
     console.error('Scan User Ticket Error:', error);
     res.status(500).json({ message: 'Server error scanning user ticket' });
+  }
+};
+
+const restrictUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (user.email === superAdminEmail) {
+      return res.status(403).json({ message: 'The Super Admin account cannot be restricted.' });
+    }
+
+    if ((user.role === 'admin' || user.role === 'sub-admin') && !isSuperAdmin(req)) {
+      return res
+        .status(403)
+        .json({ message: 'Only the Super Admin can restrict sub-admins.' });
+    }
+
+    user.isRestricted = !user.isRestricted;
+    await user.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('userUpdated', {
+        _id: user._id,
+        isRestricted: user.isRestricted,
+      });
+
+      if (user.isRestricted) {
+        io.emit('accountRestricted', {
+          userId: user._id,
+          message: 'Your account has been restricted. Please contact support.',
+        });
+      }
+    }
+
+    await logAdminAction(
+      req,
+      `Toggled restriction for user: ${user.email} (Restricted: ${user.isRestricted})`
+    );
+    res.status(200).json({
+      message: `User has been ${user.isRestricted ? 'restricted' : 'unrestricted'}`,
+      isRestricted: user.isRestricted,
+    });
+  } catch (error) {
+    console.error('Restrict User Error:', error);
+    res.status(500).json({ message: 'Error updating user restriction status' });
   }
 };
 
@@ -1510,6 +1566,7 @@ module.exports = {
   scanTicket,
   getUsers,
   toggleBlockUser,
+  restrictUser,
   createSubAdmin,
   deleteUser,
   resetOccupancy,

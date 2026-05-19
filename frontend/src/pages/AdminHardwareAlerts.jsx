@@ -30,21 +30,12 @@ const isTokenExpired = (token) => {
 };
 
 const AdminHardwareAlerts = () => {
-  const { showModal, showConfirm } = useUI();
-  const [alerts, setAlerts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filterType, setFilterType] = useState('all');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalAlertsCount, setTotalAlertsCount] = useState(0);
-  const superAdminEmail = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase();
-  const currentAdminEmail = (localStorage.getItem('adminEmail') || '').toLowerCase().trim();
-  const isSuperAdmin = currentAdminEmail === superAdminEmail;
-
-  const [filterDate, setFilterDate] = useState('');
-  const [unreadAuditCount, setUnreadAuditCount] = useState(0);
   const navigate = useNavigate();
-  const pageRef = useRef(page);
+
+  // Early return if token is missing (prevents crash during logout transition)
+  if (!localStorage.getItem('token')) return null;
+
+  const { showModal, showConfirm } = useUI();
 
   const fetchAlerts = useCallback(
     async (pageNum, silent = false) => {

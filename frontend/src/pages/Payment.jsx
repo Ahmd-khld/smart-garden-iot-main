@@ -25,7 +25,7 @@ const Payment = () => {
   const [useSavedCard, setUseSavedCard] = useState(false);
 
   // Promo Code State
-  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [promoCodeInput, setPromoCodeInput] = useState(location.state?.wonPromoCode || '');
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [isPromoValid, setIsPromoValid] = useState(false);
   const [promoError, setPromoError] = useState('');

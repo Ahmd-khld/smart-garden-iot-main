@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Smile, Meh, Frown } from 'lucide-react';
 import { socket } from '../socket';
 import WeatherWidget from '../components/WeatherWidget';
 import api from '../api';
@@ -56,6 +57,9 @@ const BookingPage = () => {
   const [loadingInsights, setLoadingInsights] = useState(true);
   const [insightStartDate, setInsightStartDate] = useState(new Date());
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const wonPromoCode = location.state?.wonPromoCode;
 
   // Calculate week window (today through today + 6 days) using local midnight
   const getWeekWindow = () => {
@@ -199,6 +203,7 @@ const BookingPage = () => {
         subscriptionType,
         totalPrice,
         selectedDate,
+        wonPromoCode,
       },
     });
   };
@@ -613,27 +618,27 @@ const BookingPage = () => {
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-smart-light"></div>
                   </div>
                 ) : insights ? (
-                  <div className="grid grid-cols-7 gap-3 mb-6">
+                  <div className="grid grid-cols-7 gap-2 w-full mt-4 mb-6">
                     {insights.days.map((day, index) => {
                       const isSelected = selectedDate === day.date;
+                      const isToday = day.isToday;
                       return (
                         <div
                           key={index}
                           onClick={() => setSelectedDate(day.date)}
-                          className={`flex flex-col items-center justify-center py-5 px-1 rounded-xl transition-all cursor-pointer ${
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all cursor-pointer min-w-0 overflow-hidden ${
                             isSelected
-                              ? 'bg-[#2a3038] border-2 border-[#8cc63f] ring-2 ring-[#8cc63f]/20'
-                              : 'bg-[#1e2329] border-2 border-transparent hover:bg-[#2a3038] hover:border-white/10'
+                              ? 'bg-[#2a303c] border-2 border-[#8cc63f] ring-4 ring-[#8cc63f]/10 shadow-lg'
+                              : isToday
+                                ? 'bg-green-500/10 border-2 border-green-500 hover:bg-green-500/20'
+                                : 'bg-gray-800 border-2 border-transparent hover:bg-[#2a303c] hover:border-white/10 shadow-sm'
                           }`}
                         >
-                          <div className="text-[10px] font-black text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-tighter">
+                          <div className="text-[10px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-tight w-full text-center">
                             {day.dayName}
-                            {day.isToday && (
-                              <span className="ml-1 text-[#8cc63f]">•</span>
-                            )}
                           </div>
                           <div
-                            className={`text-3xl font-bold mb-1 ${
+                            className={`text-xl md:text-2xl lg:text-3xl font-black my-1 italic tracking-tighter shrink-0 ${
                               day.crowdLevel === 'quiet'
                                 ? 'text-green-500'
                                 : day.crowdLevel === 'moderate'
@@ -643,25 +648,14 @@ const BookingPage = () => {
                           >
                             {day.count}
                           </div>
-                          <div
-                            className={`flex items-center gap-1.5 text-sm font-semibold ${
-                              day.crowdLevel === 'quiet'
-                                ? 'text-green-500'
-                                : day.crowdLevel === 'moderate'
-                                  ? 'text-yellow-500'
-                                  : 'text-red-500'
-                            }`}
-                          >
-                            <div
-                              className={`w-2 h-2 rounded-full ${
-                                day.crowdLevel === 'quiet'
-                                  ? 'bg-green-500'
-                                  : day.crowdLevel === 'moderate'
-                                    ? 'bg-yellow-500'
-                                    : 'bg-red-500'
-                              }`}
-                            ></div>
-                            {day.crowdLevel === 'quiet' ? 'Quiet' : day.crowdLevel === 'moderate' ? 'Mod' : 'Busy'}
+                          <div className="mt-1 flex justify-center items-center w-full">
+                            {day.crowdLevel === 'quiet' ? (
+                              <Smile className="w-5 md:w-6 h-5 md:h-6 text-green-500 shadow-sm" />
+                            ) : day.crowdLevel === 'moderate' ? (
+                              <Meh className="w-5 md:w-6 h-5 md:h-6 text-yellow-500 shadow-sm" />
+                            ) : (
+                              <Frown className="w-5 md:w-6 h-5 md:h-6 text-red-500 shadow-sm" />
+                            )}
                           </div>
                         </div>
                       );
@@ -679,18 +673,24 @@ const BookingPage = () => {
                     </button>
                   </div>
                 )}
-                <div className="flex items-center justify-center gap-4 mt-3 text-xs">
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                    <span className="text-gray-500 dark:text-gray-400">Quiet (0-30%)</span>
+                <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6 mt-6">
+                  <div className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500/5 rounded-full border border-green-500/10 shadow-sm">
+                    <Smile className="w-4 h-4 text-green-500 shrink-0" />
+                    <span className="text-gray-500 dark:text-gray-400 text-xs font-medium whitespace-nowrap tracking-tight">
+                      Quiet (0-30%)
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <span className="text-gray-500 dark:text-gray-400">Moderate (31-70%)</span>
+                  <div className="flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500/5 rounded-full border border-yellow-500/10 shadow-sm">
+                    <Meh className="w-4 h-4 text-yellow-500 shrink-0" />
+                    <span className="text-gray-500 dark:text-gray-400 text-xs font-medium whitespace-nowrap tracking-tight">
+                      Moderate (31-70%)
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                    <span className="text-gray-500 dark:text-gray-400">Busy (71-100%)</span>
+                  <div className="flex items-center justify-center gap-2 px-4 py-2 bg-red-500/5 rounded-full border border-red-500/10 shadow-sm">
+                    <Frown className="w-4 h-4 text-red-500 shrink-0" />
+                    <span className="text-gray-500 dark:text-gray-400 text-xs font-medium whitespace-nowrap tracking-tight">
+                      Busy (71-100%)
+                    </span>
                   </div>
                 </div>
               </div>

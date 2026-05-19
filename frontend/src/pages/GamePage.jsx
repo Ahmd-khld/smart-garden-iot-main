@@ -236,10 +236,10 @@ const GamePage = () => {
             You've used your 3 attempts this month! Come back next month to win more discounts.
           </p>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/book')}
             className="w-full bg-smart-dark text-white py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-black transition-colors"
           >
-            Back to Home
+            Book Tickets
           </button>
 
           {leaderboard.length > 0 && (
@@ -326,26 +326,52 @@ const GamePage = () => {
 
       {gameState === 'playing' && (
         <div className="relative">
-          <div className="flex justify-between w-full mb-4 px-2 font-black text-xl text-smart-dark dark:text-smart-glow">
-            <span className="flex items-center gap-2">
-              SCORE: <span className="text-2xl">{score}</span>
-            </span>
+          <div className="flex justify-between items-center w-full mb-4 px-2 font-black text-xl text-smart-dark dark:text-smart-glow">
+            <div className="flex flex-col">
+              <span className="flex items-center gap-2">
+                SCORE: <span className="text-2xl">{score}</span>
+              </span>
+              <button
+                onClick={() => {
+                  gameActiveRef.current = false;
+                  navigate('/profile');
+                }}
+                className="text-red-400 hover:text-red-300 font-bold tracking-wide transition-colors text-[11px] uppercase mt-1 text-left"
+              >
+                QUIT GAME
+              </button>
+            </div>
             <span className="flex items-center gap-2">
               TIME: <span className="text-2xl text-red-500">{timeLeft}s</span>
             </span>
           </div>
 
-          <GameArea>
+          <GameArea 
+            className="bg-gradient-to-br from-green-900 via-green-800 to-emerald-900 border-4 border-green-700/50 rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+            style={{
+              backgroundImage: `
+                linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)
+              `,
+              backgroundSize: '40px 40px'
+            }}
+          >
             {renderItems.map((item) => (
               <GameItem
                 key={item.id}
-                style={{ transform: `translate3d(${item.x}px, ${item.y}px, 0)` }}
+                style={{ 
+                  transform: `translate3d(${item.x}px, ${item.y}px, 0)`,
+                  transition: 'transform 0.1s linear'
+                }}
               >
                 {item.emoji}
               </GameItem>
             ))}
-            <Basket style={{ transform: `translate3d(${renderBasketPos}px, 0, 0)` }} />
-            <div className="absolute inset-0 border-4 border-smart-dark/5 pointer-events-none rounded-xl" />
+            <Basket style={{ 
+              transform: `translate3d(${renderBasketPos}px, 0, 0)`,
+              transition: 'transform 0.1s ease-out'
+            }} />
+            <div className="absolute inset-0 border-4 border-white/5 pointer-events-none rounded-xl" />
           </GameArea>
         </div>
       )}
@@ -368,7 +394,7 @@ const GamePage = () => {
             </p>
           </div>
           <button
-            onClick={() => navigate('/book')}
+            onClick={() => navigate('/book', { state: { wonPromoCode: promoCode } })}
             className="w-full bg-smart-light text-white py-4 rounded-xl font-bold uppercase tracking-widest hover:bg-smart-dark transition-all shadow-xl"
           >
             Book with Discount

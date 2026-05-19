@@ -175,14 +175,14 @@ const Profile = () => {
           <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-8 border border-smart-light/30 dark:border-smart-light/10 sticky top-28">
             <div className="flex items-center space-x-4 mb-8 pb-8 border-b border-gray-100 dark:border-gray-700">
               <div className="w-16 h-16 bg-smart-light/10 rounded-full flex items-center justify-center text-smart-light font-black text-2xl uppercase shadow-inner border border-smart-light/20">
-                {user.name?.charAt(0) || 'U'}
+                {user?.name?.charAt(0) || 'U'}
               </div>
               <div>
                 <h2 className="text-xl font-black capitalize text-smart-dark dark:text-white italic">
-                  {user.name}
+                  {user?.name}
                 </h2>
                 <p className="text-sm text-smart-gray dark:text-gray-400 font-medium">
-                  {user.role}
+                  {user?.role}
                 </p>
               </div>
             </div>
@@ -421,7 +421,7 @@ const Profile = () => {
                               {ticket.subscriptionPlan} Subscription
                             </p>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex flex-col items-end">
                             <p className="text-3xl font-black text-smart-dark dark:text-smart-glow mb-2">
                               {ticket.price}{' '}
                               <span className="text-sm text-smart-gray dark:text-gray-400 italic">
@@ -439,33 +439,36 @@ const Profile = () => {
                               </div>
                             )}
                             {ticket.status === 'ACTIVE' && (
-                              <div className="flex flex-col gap-2 items-end">
-                                <button
-                                  onClick={() =>
-                                    setSelectedQrId(selectedQrId === ticket._id ? null : ticket._id)
-                                  }
-                                  className="text-sm bg-smart-light hover:bg-smart-dark text-white font-bold py-1.5 px-4 rounded-lg shadow transition-colors w-full max-w-[140px]"
-                                >
-                                  {selectedQrId === ticket._id ? 'Hide QR' : 'Show QR Code'}
-                                </button>
-                                {ticket.subscriptionPlan === 'one-time' && !ticket.hasRescheduled && (
-                                  <button
-                                    onClick={() => handleRescheduleTicket(ticket._id)}
-                                    className="text-sm bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 font-bold py-1.5 px-4 rounded-lg shadow-sm transition-colors w-full max-w-[140px]"
-                                  >
-                                    Change Date
-                                  </button>
-                                )}
-                                <button
-                                  onClick={() => handleCancelTicket(ticket._id)}
-                                  className="text-sm bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 font-bold py-1.5 px-4 rounded-lg shadow-sm transition-colors w-full max-w-[140px]"
-                                >
-                                  Cancel & Refund
-                                </button>
-                              </div>
+                              <button
+                                onClick={() =>
+                                  setSelectedQrId(selectedQrId === ticket._id ? null : ticket._id)
+                                }
+                                className="text-xs bg-smart-light hover:bg-smart-dark text-white font-black uppercase tracking-widest py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95"
+                              >
+                                {selectedQrId === ticket._id ? 'Hide QR' : 'Show QR Code'}
+                              </button>
                             )}
                           </div>
                         </div>
+
+                        {ticket.status === 'ACTIVE' && (
+                          <div className="flex gap-3 mt-6 mb-4">
+                            {ticket.subscriptionPlan === 'one-time' && !ticket.hasRescheduled && (
+                              <button
+                                onClick={() => handleRescheduleTicket(ticket._id)}
+                                className="text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
+                              >
+                                Change Date
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleCancelTicket(ticket._id)}
+                              className="text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            >
+                              Cancel & Refund
+                            </button>
+                          </div>
+                        )}
 
                         {selectedQrId === ticket._id && (
                           <div className="bg-smart-bg dark:bg-gray-800 border-2 border-smart-light/20 rounded-2xl p-6 mb-6 flex flex-col items-center justify-center animate-fade-in-up">

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import MonkeyForm from '../components/MonkeyForm.jsx';
 import api from '../api';
 
@@ -9,6 +9,18 @@ const Login = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check for restriction reason in URL params (from Axios interceptor/App listener)
+    const params = new URLSearchParams(location.search);
+    const reason = params.get('restrictionReason') || location.state?.restrictionReason;
+    if (reason) {
+      setError(reason);
+      // Clean up the URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [location]);
 
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
@@ -21,6 +33,7 @@ const Login = () => {
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('role', data.role || 'user');
+      localStorage.setItem('userId', data._id); // Store userId for the Instant Kick listener
       if (data.role === 'admin' || data.role === 'sub-admin') {
         const storedEmail = (data.email || email).toLowerCase().trim();
         localStorage.setItem('adminEmail', storedEmail);

@@ -22,11 +22,11 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     });
   }, [location]);
 
-  const { token, role } = auth;
+  const { token, role } = auth || { token: null, role: null };
   const isAuthenticated = token && token !== 'null' && token !== 'undefined';
 
   const isActive = (path) => {
-    const isCurrent = location.pathname === path;
+    const isCurrent = location?.pathname === path;
     const base =
       'pb-1 transition-all uppercase text-[13px] tracking-widest font-black whitespace-nowrap shrink-0';
 
@@ -40,30 +40,30 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
     localStorage.removeItem('adminEmail');
+    localStorage.removeItem('userId');
     setAuth({ token: null, role: null });
     navigate('/');
   };
 
+  if (!auth) return null;
+
   return (
     <nav className="bg-smart-dark text-white shadow-xl sticky top-0 z-50 h-24 transition-colors duration-300 border-b border-smart-light/20">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 h-full flex justify-between items-center relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex justify-between items-center">
         {/* Logo */}
         <Link
           to="/"
-          className="hover:opacity-90 transition transform relative md:absolute md:left-6 md:top-1/2 md:-translate-y-1/2 z-10 shrink-0 mr-4 md:mr-0"
+          className="hover:opacity-90 transition transform shrink-0 z-10"
         >
           <img
             src={logo}
             alt="Smart Garden Logo"
-            className="h-14 md:h-32 w-auto object-contain drop-shadow-xl"
+            className="h-12 md:h-24 w-auto object-contain drop-shadow-xl"
           />
         </Link>
 
-        {/* Spacer for Logo */}
-        <div className="hidden md:block w-32 lg:w-64 shrink-0"></div>
-
         {/* Nav Links */}
-        <div className="flex items-center space-x-4 lg:space-x-8 text-[15px] font-medium overflow-x-auto w-full justify-start md:justify-end scrollbar-hide py-2">
+        <div className="flex items-center gap-6 lg:gap-8 text-[15px] font-bold overflow-x-auto justify-end scrollbar-hide py-2 ml-4">
           {!isAuthenticated && (
             <Link to="/" className={isActive('/')}>
               Home
@@ -71,25 +71,31 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
           )}
           {!(role === 'admin' || role === 'sub-admin') && (
             <>
-              <Link to="/about" className={isActive('/about')}>
-                About Us
-              </Link>
+              {!isAuthenticated && (
+                <Link to="/about" className={isActive('/about')}>
+                  About Us
+                </Link>
+              )}
               <Link to="/map" className={isActive('/map')}>
                 Park Map
               </Link>
             </>
           )}
-          <Link to="/book" className={isActive('/book')}>
-            Book Tickets
-          </Link>
-          {!(role === 'admin' || role === 'sub-admin') && (
-            <Link to="/rewards" className={isActive('/rewards')}>
-              Play & Win
-            </Link>
+          {isAuthenticated && (
+            <>
+              <Link to="/book" className={isActive('/book')}>
+                Book Tickets
+              </Link>
+              {!(role === 'admin' || role === 'sub-admin') && (
+                <Link to="/rewards" className={isActive('/rewards')}>
+                  Play & Win
+                </Link>
+              )}
+            </>
           )}
 
           {/* Theme Toggle Button */}
-          <div className="ml-2 shrink-0">
+          <div className="shrink-0">
             <ThemeToggle isDarkMode={darkMode} toggleTheme={toggleDarkMode} />
           </div>
 
@@ -113,7 +119,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
           {isAuthenticated && !location.pathname.includes('/admin') && (
             <button
               onClick={handleLogout}
-              className="text-white/70 hover:text-white transition-colors ml-2 font-bold uppercase text-xs tracking-widest whitespace-nowrap shrink-0"
+              className="text-white/70 hover:text-white transition-colors font-bold uppercase text-xs tracking-widest whitespace-nowrap shrink-0"
             >
               Logout
             </button>
@@ -122,7 +128,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
           {isAuthenticated && (role === 'admin' || role === 'sub-admin') && (
             <Link
               to="/admin/dashboard"
-              className="flex items-center space-x-2 bg-white/10 border border-white/20 hover:bg-white/20 text-smart-glow px-5 py-2.5 rounded-xl font-black transition-all shadow-md transform hover:-translate-y-0.5 ml-4 whitespace-nowrap shrink-0"
+              className="flex items-center space-x-2 bg-white/10 border border-white/20 hover:bg-white/20 text-smart-glow px-5 py-2.5 rounded-xl font-black transition-all shadow-md transform hover:-translate-y-0.5 whitespace-nowrap shrink-0"
             >
               <svg
                 className="w-4 h-4 text-smart-glow"

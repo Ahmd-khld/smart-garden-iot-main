@@ -8,6 +8,10 @@ import { useUI } from '../context/UIContext';
 const AdminUserTickets = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
+
+  // Early return if token is missing (prevents crash during logout transition)
+  if (!localStorage.getItem('token')) return null;
+
   const location = useLocation();
   const { showModal } = useUI();
   const [tickets, setTickets] = useState([]);
@@ -170,7 +174,7 @@ const AdminUserTickets = () => {
                 </svg>
                 <div>
                   <p className="text-[10px] font-black uppercase text-red-600 dark:text-red-400 tracking-widest">Account Restricted</p>
-                  <p className="text-sm font-bold text-smart-dark dark:text-white italic">Reason: {user.blockReason || 'No reason specified'}</p>
+                  <p className="text-sm font-bold text-smart-dark dark:text-white italic">Reason: {user?.blockReason || 'No reason specified'}</p>
                 </div>
               </div>
             )}

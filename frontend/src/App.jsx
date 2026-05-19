@@ -15,6 +15,7 @@ import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import GamePage from './pages/GamePage';
 import { Navigate } from 'react-router-dom';
+import { socket } from './socket';
 
 // Safe local storage utility to prevent complete app crashes when
 // the browser restricts cookies/local storage (e.g. Incognito mode)
@@ -31,19 +32,45 @@ const getSafeStorage = (key) => {
 const AdminRoute = ({ children }) => {
   const token = getSafeStorage('token');
   const role = getSafeStorage('role');
-  if (!token || (role !== 'admin' && role !== 'sub-admin')) return <Navigate to="/" replace />;
+  
+  if (!token) return <Navigate to="/login" replace />;
+  if (role !== 'admin' && role !== 'sub-admin') return <Navigate to="/" replace />;
+  
   return children;
 };
 
 // User Protection Component
 const PrivateRoute = ({ children }) => {
   const token = getSafeStorage('token');
-  if (!token) return <Navigate to="/" replace />;
+  if (!token) return <Navigate to="/login" replace />;
   return children;
 };
 
 function App() {
   const [darkMode, setDarkMode] = React.useState(getSafeStorage('theme') === 'dark');
+
+  React.useEffect(() => {
+    // 1. Listen for account restriction (Instant Kick)
+    const handleAccountRestricted = (data) => {
+      const localUserId = localStorage.getItem('userId'); 
+      if (localUserId === data.userId) {
+        // CLEANUP FIRST
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('adminEmail');
+        
+        // HARD REDIRECT TO BYPASS REACT RENDER CYCLE CRASHES
+        window.location.href = `/login?restrictionReason=${encodeURIComponent(data.message)}`;
+      }
+    };
+
+    socket.on('accountRestricted', handleAccountRestricted);
+
+    return () => {
+      socket.off('accountRestricted', handleAccountRestricted);
+    };
+  }, []);
 
   React.useEffect(() => {
     try {
@@ -62,14 +89,28 @@ function App() {
   const toggleDarkMode = () => setDarkMode(!darkMode);
 
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="min-h-screen bg-smart-bg dark:bg-gray-900 text-smart-gray dark:text-gray-100 font-sans flex flex-col transition-colors duration-500">
         <Navbar darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
         <main className="flex-grow w-full flex flex-col">
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/book" element={<BookingPage />} />
-            <Route path="/payment" element={<Payment />} />
+            <Route
+              path="/book"
+              element={
+                <PrivateRoute>
+                  <BookingPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/payment"
+              element={
+                <PrivateRoute>
+                  <Payment />
+                </PrivateRoute>
+              }
+            />
             <Route path="/about" element={<About />} />
             <Route path="/map" element={<ParkMap />} />
             <Route path="/login" element={<Login />} />

@@ -38,6 +38,10 @@ const isTokenExpired = (token) => {
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+
+  // Early return if token is missing (prevents crash during logout transition)
+  if (!localStorage.getItem('token')) return null;
+
   const { showModal, showPrompt, showConfirm } = useUI();
   const [searchParams, setSearchParams] = useSearchParams();
   const [stats, setStats] = useState(null);
@@ -58,7 +62,7 @@ const AdminDashboard = () => {
   const [isCrowdInsightsExpanded, setIsCrowdInsightsExpanded] = useState(true);
   const [isUserManagementExpanded, setIsUserManagementExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('ALL');
   const [insightStartDate, setInsightStartDate] = useState(new Date());
   const [isHardwareAlertsExpanded, setIsHardwareAlertsExpanded] = useState(true);
   const [alertFilterType, setAlertFilterType] = useState('all');
@@ -553,6 +557,36 @@ const AdminDashboard = () => {
         type: 'error',
         text: 'Multiple cameras not detected or scanner not active yet.',
       });
+    }
+  };
+
+  const handleRestrictUser = async (userId, currentStatus) => {
+    const isConfirmed = await showConfirm(
+      `Are you sure you want to ${currentStatus ? 'remove restrictions from' : 'restrict'} this user? ${currentStatus ? 'They will be allowed to log in again.' : 'They will be blocked from logging in and advised to contact support.'}`,
+      currentStatus ? 'Remove Restriction' : 'Restrict User'
+    );
+    if (!isConfirmed) return;
+
+    const token = localStorage.getItem('token');
+    try {
+      const res = await api.put(
+        `/admin/users/${userId}/restrict`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      showModal(res.data.message, 'Success', 'success');
+      // Update local state
+      setRegularUsers((prev) =>
+        prev.map((u) => (u._id === userId ? { ...u, isRestricted: !currentStatus } : u))
+      );
+      setSubAdmins((prev) =>
+        prev.map((u) => (u._id === userId ? { ...u, isRestricted: !currentStatus } : u))
+      );
+    } catch (error) {
+      console.error('Failed to restrict user:', error);
+      showModal(error.response?.data?.message || 'Action failed.', 'Error', 'error');
     }
   };
 
@@ -1921,6 +1955,26 @@ const AdminDashboard = () => {
   };
 
   const { canToggle, allExpanded, toggle: toggleAllPanels } = getTabExpansionState();
+
+  const filteredUsers = useMemo(() => {
+    return regularUsers.filter((user) => {
+      const matchesSearch =
+        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const status = filterStatus.toUpperCase();
+      let matchesStatus = true;
+      if (status === 'ACTIVE') {
+        matchesStatus = !user.isBlocked && !user.isRestricted;
+      } else if (status === 'RESTRICTED') {
+        matchesStatus = user.isRestricted;
+      } else if (status === 'BLOCKED') {
+        matchesStatus = user.isBlocked;
+      }
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [regularUsers, searchQuery, filterStatus]);
 
   return (
     <div className="min-h-screen bg-smart-bg dark:bg-black font-sans flex flex-col transition-colors duration-300">
@@ -3316,9 +3370,10 @@ const AdminDashboard = () => {
                         onChange={(e) => setFilterStatus(e.target.value)}
                         className="w-full md:w-auto px-5 py-3 rounded-2xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition font-mono text-xs font-black tracking-widest cursor-pointer"
                       >
-                        <option value="all">ALL STATUSES</option>
-                        <option value="active">ACTIVE USERS</option>
-                        <option value="blocked">BLOCKED USERS</option>
+                        <option value="ALL">ALL STATUSES</option>
+                        <option value="ACTIVE">ACTIVE USERS</option>
+                        <option value="RESTRICTED">RESTRICTED USERS</option>
+                        <option value="BLOCKED">BLOCKED USERS</option>
                       </select>
                     </div>
                   </div>
@@ -3335,7 +3390,7 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                        {regularUsers.map((user) => (
+                        {filteredUsers.map((user) => (
                           <tr
                             key={user._id}
                             className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
@@ -3352,15 +3407,24 @@ const AdminDashboard = () => {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-center">
-                              {user.isBlocked ? (
-                                <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-red-200 dark:border-red-800">
-                                  Blocked
-                                </span>
-                              ) : (
-                                <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-smart-light/20">
-                                  Active
-                                </span>
-                              )}
+                              <div className="flex flex-col items-center space-y-1">
+                                {user.isRestricted && (
+                                  <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-orange-200 dark:border-orange-800">
+                                    Restricted
+                                  </span>
+                                )}
+                                {user.isBlocked ? (
+                                  <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-red-200 dark:border-red-800">
+                                    Blocked
+                                  </span>
+                                ) : (
+                                  !user.isRestricted && (
+                                    <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-smart-light/20">
+                                      Active
+                                    </span>
+                                  )
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-3 pr-6 text-right">
                               <div className="flex justify-end items-center space-x-2">
@@ -3370,7 +3434,6 @@ const AdminDashboard = () => {
                                       state: { userName: user.name, fromTab: activeTab },
                                     })
                                   }
-
                                   className="px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-600 hover:text-white border border-blue-200 dark:border-blue-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
                                 >
                                   View Tickets
@@ -3390,10 +3453,16 @@ const AdminDashboard = () => {
                                   </button>
                                 )}
                                 <button
+                                  onClick={() => handleRestrictUser(user._id, user.isRestricted)}
+                                  className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${user.isRestricted ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-md' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-600 hover:text-white border border-orange-200 dark:border-orange-800 shadow-sm'}`}
+                                >
+                                  {user.isRestricted ? 'Unrestrict' : 'Restrict'}
+                                </button>
+                                <button
                                   onClick={() => handleBlockUser(user._id, user.isBlocked)}
                                   className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${user.isBlocked ? 'bg-smart-light text-white hover:bg-smart-dark shadow-md' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-600 hover:text-white border border-red-200 dark:border-red-800 shadow-sm'}`}
                                 >
-                                  {user.isBlocked ? 'Unblock' : 'Restrict'}
+                                  {user.isBlocked ? 'Unblock' : 'Block'}
                                 </button>
                                 {isSuperAdmin && (
                                   <button
@@ -3407,7 +3476,7 @@ const AdminDashboard = () => {
                             </td>
                           </tr>
                         ))}
-                        {regularUsers.length === 0 && (
+                        {filteredUsers.length === 0 && (
                           <tr>
                             <td
                               colSpan="4"
@@ -3528,15 +3597,24 @@ const AdminDashboard = () => {
                             {admin.email}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {admin.isBlocked ? (
-                              <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-red-200 dark:border-red-800">
-                                Blocked
-                              </span>
-                            ) : (
-                              <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-smart-light/20">
-                                Active
-                              </span>
-                            )}
+                            <div className="flex flex-col items-center space-y-1">
+                              {admin.isRestricted && (
+                                <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-orange-200 dark:border-orange-800">
+                                  Restricted
+                                </span>
+                              )}
+                              {admin.isBlocked ? (
+                                <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-red-200 dark:border-red-800">
+                                  Blocked
+                                </span>
+                              ) : (
+                                !admin.isRestricted && (
+                                  <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-smart-light/20">
+                                    Active
+                                  </span>
+                                )
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3 pr-6 text-right">
                             <div className="flex justify-end items-center space-x-2">
@@ -3567,10 +3645,18 @@ const AdminDashboard = () => {
                                     </button>
                                   )}
                                   <button
+                                    onClick={() =>
+                                      handleRestrictUser(admin._id, admin.isRestricted)
+                                    }
+                                    className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${admin.isRestricted ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-md' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-600 hover:text-white border border-orange-200 dark:border-orange-800 shadow-sm'}`}
+                                  >
+                                    {admin.isRestricted ? 'Unrestrict' : 'Restrict'}
+                                  </button>
+                                  <button
                                     onClick={() => handleBlockUser(admin._id, admin.isBlocked)}
                                     className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${admin.isBlocked ? 'bg-smart-light text-white hover:bg-smart-dark shadow-md' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-600 hover:text-white border border-red-200 dark:border-red-800 shadow-sm'}`}
                                   >
-                                    {admin.isBlocked ? 'Unblock' : 'Restrict'}
+                                    {admin.isBlocked ? 'Unblock' : 'Block'}
                                   </button>
                                   <button
                                     onClick={() => handleDeleteUser(admin._id)}

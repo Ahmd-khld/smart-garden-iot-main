@@ -17,6 +17,12 @@ const protect = async (req, res, next) => {
     );
 
     if (user) {
+      if (user.isRestricted) {
+        return res.status(403).json({
+          message: 'Your account has been restricted. Please contact support.',
+          isRestricted: true,
+        });
+      }
       req.user = user;
       next();
     } else {

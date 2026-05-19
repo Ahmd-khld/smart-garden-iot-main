@@ -71,6 +71,13 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    if (user.isRestricted) {
+      return res.status(403).json({
+        message: 'Your account has been restricted. Please contact support for assistance.',
+        isRestricted: true,
+      });
+    }
+
     if (await user.matchPassword(password)) {
       res.json({
         _id: user._id,

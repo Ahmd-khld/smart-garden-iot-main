@@ -5,6 +5,7 @@ const {
   scanTicket,
   getUsers,
   toggleBlockUser,
+  restrictUser,
   createSubAdmin,
   deleteUser,
   resetOccupancy,
@@ -42,6 +43,7 @@ router.post('/users/:userId/tickets/:ticketId/scan', requireAdmin, scanUserTicke
 router.put('/activate-cash-ticket/:id', requireAdmin, activateCashTicket);
 router.get('/pending-cash-tickets', requireAdmin, getPendingCashTickets);
 router.patch('/users/:id/block', requireAdmin, toggleBlockUser);
+router.put('/users/:id/restrict', requireAdmin, restrictUser);
 router.delete('/users/:id', requireSuperAdmin, deleteUser);
 router.post('/sub-admin', requireSuperAdmin, createSubAdmin);
 router.get('/audit-logs', requireAdmin, getAuditLogs);
