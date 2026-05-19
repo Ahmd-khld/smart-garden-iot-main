@@ -64,9 +64,11 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
 
         {/* Nav Links */}
         <div className="flex items-center space-x-4 lg:space-x-8 text-[15px] font-medium overflow-x-auto w-full justify-start md:justify-end scrollbar-hide py-2">
-          <Link to="/" className={isActive('/')}>
-            Home
-          </Link>
+          {!isAuthenticated && (
+            <Link to="/" className={isActive('/')}>
+              Home
+            </Link>
+          )}
           <Link to="/about" className={isActive('/about')}>
             About Us
           </Link>
@@ -85,7 +87,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             <ThemeToggle isDarkMode={darkMode} toggleTheme={toggleDarkMode} />
           </div>
 
-          {isAuthenticated && role === 'user' && (
+          {isAuthenticated && (
             <Link
               to="/profile"
               className={`flex items-center space-x-1 shrink-0 ${isActive('/profile')}`}
@@ -111,7 +113,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             </button>
           )}
 
-          {isAuthenticated && role === 'admin' && (
+          {isAuthenticated && (role === 'admin' || role === 'sub-admin') && (
             <Link
               to="/admin/dashboard"
               className="flex items-center space-x-2 bg-white/10 border border-white/20 hover:bg-white/20 text-smart-glow px-5 py-2.5 rounded-xl font-black transition-all shadow-md transform hover:-translate-y-0.5 ml-4 whitespace-nowrap shrink-0"

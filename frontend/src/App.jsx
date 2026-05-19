@@ -31,7 +31,7 @@ const getSafeStorage = (key) => {
 const AdminRoute = ({ children }) => {
   const token = getSafeStorage('token');
   const role = getSafeStorage('role');
-  if (!token || role !== 'admin') return <Navigate to="/" replace />;
+  if (!token || (role !== 'admin' && role !== 'sub-admin')) return <Navigate to="/" replace />;
   return children;
 };
 

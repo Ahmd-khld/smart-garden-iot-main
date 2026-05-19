@@ -21,12 +21,12 @@ const Login = () => {
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('role', data.role || 'user');
-      if (data.role === 'admin') {
+      if (data.role === 'admin' || data.role === 'sub-admin') {
         const storedEmail = (data.email || email).toLowerCase().trim();
         localStorage.setItem('adminEmail', storedEmail);
       }
 
-      if (data.role === 'admin') {
+      if (data.role === 'admin' || data.role === 'sub-admin') {
         navigate('/admin/dashboard');
       } else {
         navigate('/book');

@@ -197,6 +197,11 @@ io.on('connection', (socket) => {
     console.log(`Socket ${socket.id} joined room: user-${userId}-tickets`);
   });
 
+  socket.on('joinAdminRoom', () => {
+    socket.join('admin-room');
+    console.log(`Socket ${socket.id} joined room: admin-room`);
+  });
+
   socket.on('leaveUserRoom', (userId) => {
     socket.leave(`user-${userId}-tickets`);
   });

@@ -47,9 +47,19 @@ const broadcastOccupancy = async (req) => {
     status: 'used',
     updatedAt: { $gte: startOfDay, $lte: endOfDay },
   });
-  const dailyCapacity = parseInt(process.env.DAILY_CAPACITY) || 1000;
-  const capacityPercentage = Math.round((currentOccupancy / dailyCapacity) * 100);
+  const maxCapacity = parseInt(process.env.DAILY_CAPACITY) || 1000;
+  const capacityPercentage = Math.round((currentOccupancy / maxCapacity) * 100);
+  
+  // Broadcast to everyone (legacy)
   io.emit('occupancyUpdate', { currentOccupancy, capacityPercentage });
+  
+  // Broadcast specifically to admin room (new)
+  io.to('admin-room').emit('occupancyUpdated', {
+    currentOccupancy,
+    capacityPercentage,
+    maxCapacity,
+    updatedAt: new Date(),
+  });
 };
 
 // Helper to broadcast ticket status changes in real-time
@@ -259,6 +269,16 @@ const scanTicket = async (req, res) => {
       return handleFailure('Expired ticket scanned at Gate.', 'warning', 'Ticket is expired');
     }
 
+    // CASH PAYMENT HANDLING
+    if (ticket.paymentStatus === 'PENDING' && ticket.paymentMethod === 'CASH') {
+      return res.status(200).json({
+        actionRequired: 'COLLECT_CASH',
+        amountToCollect: ticket.price,
+        message: 'Please collect cash to activate this ticket.',
+        ticket,
+      });
+    }
+
     const subType = ticket.subscriptionType || ticket.subscriptionPlan || 'one-time';
 
     if (subType === 'monthly') {
@@ -331,16 +351,20 @@ const getUsers = async (req, res) => {
 
     const query = {};
     if (role === 'admin') {
-      // SUB-ADMIN SECURITY: Sub-admins can NEVER see or list other admins.
+      // SUB-ADMIN SECURITY: Sub-admins can NEVER see or list other admins EXCEPT themselves.
       if (!isSuperAdmin(req)) {
-        return res
-          .status(403)
-          .json({ message: 'Forbidden: Sub-admins cannot view other admin accounts.' });
+        // Allow sub-admins to see their own account if they search for it
+        query.$and = [{ role: { $in: ['admin', 'sub-admin'] } }, { _id: req.user._id }];
+      } else {
+        query.role = { $in: ['admin', 'sub-admin'] };
       }
-      query.role = 'admin';
     } else {
-      // DEFAULT: Always filter for 'user' role unless 'admin' is explicitly requested
-      query.role = 'user';
+      // DEFAULT: Show regular users. If sub-admin, also allow them to see themselves in the list if they appear.
+      if (isSuperAdmin(req)) {
+        query.role = 'user';
+      } else {
+        query.$or = [{ role: 'user' }, { _id: req.user._id }];
+      }
     }
 
     if (search) {
@@ -464,6 +488,16 @@ const scanUserTicket = async (req, res) => {
       return res.status(400).json({ message: `Ticket is already ${ticket.status}` });
     }
 
+    // CASH PAYMENT HANDLING
+    if (ticket.paymentStatus === 'PENDING' && ticket.paymentMethod === 'CASH') {
+      return res.status(200).json({
+        actionRequired: 'COLLECT_CASH',
+        amountToCollect: ticket.price,
+        message: 'Please collect cash to activate this ticket.',
+        ticket,
+      });
+    }
+
     ticket.status = 'used';
     ticket.scanHistory = ticket.scanHistory || [];
     ticket.scanHistory.push(new Date());
@@ -480,6 +514,8 @@ const scanUserTicket = async (req, res) => {
     }
 
     await logAdminAction(req, `Scanned ticket ${ticketId} for user ${userId}`);
+
+    await broadcastOccupancy(req);
 
     res.status(200).json({ message: 'Ticket scanned successfully', ticket });
   } catch (error) {
@@ -498,7 +534,7 @@ const toggleBlockUser = async (req, res) => {
       return res.status(403).json({ message: 'The Super Admin account cannot be blocked.' });
     }
 
-    if (user.role === 'admin' && !isSuperAdmin(req)) {
+    if ((user.role === 'admin' || user.role === 'sub-admin') && !isSuperAdmin(req)) {
       return res
         .status(403)
         .json({ message: 'Only the Super Admin can block or unblock sub-admins.' });
@@ -571,7 +607,7 @@ const createSubAdmin = async (req, res) => {
       phone: 'N/A',
       password, // Hashing is handled by the User model's pre-save middleware
       age: 30,
-      role: 'admin',
+      role: 'sub-admin',
     });
 
     await newAdmin.save();
@@ -624,13 +660,13 @@ const deleteUser = async (req, res) => {
     const io = req.app.get('io');
 
     // Automatically clean up the IP Whitelist if a Sub-Admin is deleted
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'sub-admin') {
       const deletedIp = await WhitelistedIP.findOneAndDelete({ adminEmail: user.email });
       if (io && deletedIp) io.emit('whitelistIpRemoved', deletedIp._id);
     }
 
     if (io) {
-      if (user.role === 'admin') {
+      if (user.role === 'admin' || user.role === 'sub-admin') {
         io.emit('subAdminDeleted', user._id.toString());
       } else {
         io.emit('userDeleted', user._id.toString());
@@ -1369,7 +1405,11 @@ const generateMockData = async (req, res) => {
 
     // 7. Trigger Global Refresh
     const io = req.app.get('io');
-    if (io) io.emit('dataRefresh');
+    if (io) {
+      io.emit('dataRefresh');
+      io.emit('dashboardStatsUpdated');
+      io.emit('crowdDataUpdated');
+    }
 
     res.status(200).json({
       message: `Scalable simulation seeding complete! (${SCALE.multiplier}x)
@@ -1382,6 +1422,80 @@ const generateMockData = async (req, res) => {
   } catch (error) {
     console.error('[MockDataHammer] CRITICAL ERROR:', error.message);
     res.status(500).json({ message: 'Failed to generate mock data', error: error.message });
+  }
+};
+
+const activateCashTicket = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const ticket = await Ticket.findById(id);
+    if (!ticket) return res.status(404).json({ message: 'Ticket not found' });
+
+    if (ticket.paymentMethod !== 'CASH') {
+      return res.status(400).json({ message: 'This ticket is not a cash payment.' });
+    }
+
+    if (ticket.paymentStatus === 'PAID') {
+      return res.status(400).json({ message: 'Ticket is already paid.' });
+    }
+
+    ticket.paymentStatus = 'PAID';
+    ticket.status = 'used'; // Counts as immediate gate entry
+    ticket.scanHistory = ticket.scanHistory || [];
+    ticket.scanHistory.push(new Date());
+    await ticket.save();
+
+    // Emit targeted socket event to the user's specific room
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user-${ticket.userId}-tickets`).emit('ticketStatusChanged', {
+        ticketId: ticket._id,
+        status: 'used',
+        paymentStatus: 'PAID',
+        updatedAt: ticket.updatedAt,
+        ticket,
+      });
+
+      // Notify admin room for real-time dashboard updates
+      io.to('admin-room').emit('cashTicketCollected', ticket._id);
+      io.to('admin-room').emit('dashboardStatsUpdated');
+      
+      // Global broadcast for public availability window
+      io.emit('crowdDataUpdated');
+      
+      // Update global occupancy stats
+      await broadcastOccupancy(req);
+    }
+
+    await logAdminAction(req, `Manually activated cash ticket ${id}`);
+
+    res.status(200).json({ message: 'Ticket activated successfully', ticket });
+  } catch (error) {
+    console.error('Activate Cash Ticket Error:', error);
+    res.status(500).json({ message: 'Server error activating ticket' });
+  }
+};
+
+const getPendingCashTickets = async (req, res) => {
+  try {
+    const { status } = req.query;
+    const query = { paymentMethod: 'CASH' };
+    
+    if (status === 'PAID') {
+      query.paymentStatus = 'PAID';
+    } else {
+      query.paymentStatus = 'PENDING';
+    }
+
+    const tickets = await Ticket.find(query)
+      .populate('userId', 'name email phone')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json(tickets);
+  } catch (error) {
+    console.error('Fetch Cash Tickets Error:', error);
+    res.status(500).json({ message: 'Error fetching cash tickets' });
   }
 };
 
@@ -1410,5 +1524,7 @@ module.exports = {
   deleteBackup,
   getUserTickets,
   scanUserTicket,
+  activateCashTicket,
+  getPendingCashTickets,
   generateMockData,
 };

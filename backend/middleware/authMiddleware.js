@@ -29,9 +29,9 @@ const protect = async (req, res, next) => {
   }
 };
 
-// Middleware to check for admin role
+// Middleware to check for admin or sub-admin role
 const admin = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
+  if (req.user && (req.user.role === 'admin' || req.user.role === 'sub-admin')) {
     next();
   } else {
     res.status(403).send('Not authorized as an admin');

@@ -14,7 +14,8 @@ const requireAdmin = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id || decoded._id || decoded.userId);
 
-    if (!user || user.role !== 'admin') {
+    // Allow both 'admin' and 'sub-admin' roles to pass this check
+    if (!user || (user.role !== 'admin' && user.role !== 'sub-admin')) {
       return res.status(403).json({ message: 'Forbidden: Admin access required' });
     }
 

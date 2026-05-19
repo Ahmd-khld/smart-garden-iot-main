@@ -25,6 +25,8 @@ const {
   unlockScanner,
   getUserTickets,
   scanUserTicket,
+  activateCashTicket,
+  getPendingCashTickets,
   generateMockData,
 } = require('../controllers/adminController');
 const { protect } = require('../middleware/authMiddleware');
@@ -37,6 +39,8 @@ router.post('/generate-mock-data', protect, requireSuperAdmin, generateMockData)
 router.get('/users', requireAdmin, getUsers);
 router.get('/users/:userId/tickets', requireAdmin, getUserTickets);
 router.post('/users/:userId/tickets/:ticketId/scan', requireAdmin, scanUserTicket);
+router.put('/activate-cash-ticket/:id', requireAdmin, activateCashTicket);
+router.get('/pending-cash-tickets', requireAdmin, getPendingCashTickets);
 router.patch('/users/:id/block', requireAdmin, toggleBlockUser);
 router.delete('/users/:id', requireSuperAdmin, deleteUser);
 router.post('/sub-admin', requireSuperAdmin, createSubAdmin);

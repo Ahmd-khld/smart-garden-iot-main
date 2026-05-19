@@ -24,50 +24,65 @@ const initTicketCron = () => {
  */
 const handleExpirations = async () => {
   const now = new Date();
+  const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
   
   // Find tickets that are about to expire to emit events for them
   const overdueTickets = await Ticket.find({
-    status: 'active',
+    status: { $ne: 'expired' },
     validUntil: { $lt: now }
   });
 
-  if (overdueTickets.length === 0) return;
-
-  const result = await Ticket.updateMany(
-    {
-      _id: { $in: overdueTickets.map(t => t._id) }
-    },
-    {
-      $set: { status: 'expired' }
-    }
-  );
-
-  if (result.modifiedCount > 0) {
-    console.log(`[Cron] Task B: Expired ${result.modifiedCount} overdue tickets.`);
-    
-    // Broadcast the status change to all connected clients in real-time
-    try {
-      const { io } = require('../server');
-      if (io) {
-        overdueTickets.forEach(ticket => {
-          const payload = {
-            ticketId: ticket._id.toString(),
-            userId: ticket.userId.toString(),
-            status: 'expired',
-            updatedAt: new Date(),
-            ticket: { ...ticket.toObject(), status: 'expired' }
-          };
-          
-          // Emit to the specific user room (Admin dashboard listeners)
-          io.to(`user-${ticket.userId.toString()}-tickets`).emit('ticketStatusChanged', payload);
-          // Global broadcast for general admin view updates
-          io.emit('globalTicketUpdate', payload);
-        });
-        console.log(`[Cron] Real-time status updates broadcasted for ${overdueTickets.length} tickets.`);
+  if (overdueTickets.length > 0) {
+    const result = await Ticket.updateMany(
+      {
+        _id: { $in: overdueTickets.map(t => t._id) }
+      },
+      {
+        $set: { status: 'expired' }
       }
-    } catch (err) {
-      console.error('[Cron] Failed to broadcast expiration updates:', err.message);
+    );
+
+    if (result.modifiedCount > 0) {
+      console.log(`[Cron] Task B: Expired ${result.modifiedCount} overdue tickets.`);
+      
+      // Broadcast the status change to all connected clients in real-time
+      try {
+        const { io } = require('../server');
+        if (io) {
+          overdueTickets.forEach(ticket => {
+            const payload = {
+              ticketId: ticket._id.toString(),
+              userId: ticket.userId.toString(),
+              status: 'expired',
+              updatedAt: new Date(),
+              ticket: { ...ticket.toObject(), status: 'expired' }
+            };
+            
+            // Emit to the specific user room (Admin dashboard listeners)
+            io.to(`user-${ticket.userId.toString()}-tickets`).emit('ticketStatusChanged', payload);
+            // Global broadcast for general admin view updates
+            io.emit('globalTicketUpdate', payload);
+          });
+        }
+      } catch (err) {
+        console.error('[Cron] Failed to broadcast expiration updates:', err.message);
+      }
     }
+  }
+
+  // NEW: Permanently delete cash reservations that have been expired for more than 24 hours
+  try {
+    const deletedResult = await Ticket.deleteMany({
+      paymentMethod: 'CASH',
+      status: 'expired',
+      validUntil: { $lt: yesterdayStart },
+    });
+    if (deletedResult.deletedCount > 0) {
+      console.log(`[Cron] Task C: Deleted ${deletedResult.deletedCount} abandoned cash reservations.`);
+    }
+  } catch (deleteError) {
+    console.error('[Cron] Failed to delete abandoned cash reservations:', deleteError.message);
   }
 };
 

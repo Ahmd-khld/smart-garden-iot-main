@@ -330,7 +330,7 @@ const Profile = () => {
                   Purchase History
                 </h2>
                 <div className="flex bg-smart-bg dark:bg-gray-700 p-1 rounded-xl border border-smart-light/10 overflow-x-auto scrollbar-hide max-w-full">
-                  {['all', 'active', 'used', 'expired'].map((status) => (
+                  {['all', 'pending', 'active', 'used', 'expired'].map((status) => (
                     <button
                       key={status}
                       onClick={() => setHistoryFilter(status)}
@@ -340,14 +340,26 @@ const Profile = () => {
                           : 'text-smart-gray dark:text-gray-400 hover:text-smart-dark dark:hover:text-white'
                       }`}
                     >
-                      {status}
+                      {status === 'pending' ? 'Pending Cash' : status}
                     </button>
                   ))}
                 </div>
               </div>
 
               <div className="space-y-6">
-                {tickets.filter(t => historyFilter === 'all' || t.status === historyFilter).length === 0 ? (
+                {tickets.filter(t => {
+                  if (historyFilter === 'all') return true;
+                  if (historyFilter === 'pending') {
+                    return t.paymentMethod === 'CASH' && t.paymentStatus === 'PENDING';
+                  }
+                  if (historyFilter === 'active') {
+                    return t.status === 'active' && t.paymentStatus !== 'PENDING';
+                  }
+                  if (historyFilter === 'used' || historyFilter === 'expired') {
+                    return t.status === historyFilter;
+                  }
+                  return t.status === historyFilter;
+                }).length === 0 ? (
                   <div className="p-12 text-center border-2 border-dashed border-smart-light/20 rounded-3xl bg-smart-bg dark:bg-gray-700">
                     <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-smart-light/10 shadow-sm">
                       <svg
@@ -371,7 +383,16 @@ const Profile = () => {
                 ) : (
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     {tickets
-                      .filter((t) => historyFilter === 'all' || t.status === historyFilter)
+                      .filter((t) => {
+                        if (historyFilter === 'all') return true;
+                        if (historyFilter === 'pending') {
+                          return t.paymentMethod === 'CASH' && t.paymentStatus === 'PENDING';
+                        }
+                        if (historyFilter === 'active') {
+                          return t.status === 'active' && t.paymentStatus !== 'PENDING';
+                        }
+                        return t.status === historyFilter;
+                      })
                       .map((ticket) => (
                       <div
                         key={ticket._id}
@@ -381,14 +402,16 @@ const Profile = () => {
                           <div>
                             <span
                               className={`inline-block px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-sm ${
-                                ticket.status === 'active'
+                                ticket.status === 'active' && ticket.paymentStatus !== 'PENDING'
                                   ? 'bg-smart-light/20 text-smart-dark dark:text-smart-light border border-smart-light/30'
-                                  : ticket.status === 'used'
-                                    ? 'bg-gray-100 dark:bg-gray-600 text-smart-gray dark:text-gray-400 border border-gray-200 dark:border-gray-500 opacity-60'
-                                    : 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 border border-red-100 dark:border-red-900 opacity-60'
+                                  : (ticket.paymentMethod === 'CASH' && ticket.paymentStatus === 'PENDING')
+                                    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                                    : ticket.status === 'used'
+                                      ? 'bg-gray-100 dark:bg-gray-600 text-smart-gray dark:text-gray-400 border border-gray-200 dark:border-gray-500 opacity-60'
+                                      : 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 border border-red-100 dark:border-red-900 opacity-60'
                               }`}
                             >
-                              {ticket.status}
+                              {(ticket.paymentMethod === 'CASH' && ticket.paymentStatus === 'PENDING') ? 'Pending Cash' : ticket.status}
                             </span>
                             <h3 className="text-2xl font-black text-smart-dark dark:text-white capitalize mt-3 italic">
                               {ticket.ticketType} Pass
@@ -404,6 +427,16 @@ const Profile = () => {
                                 EGP
                               </span>
                             </p>
+                            {ticket.isPromoApplied && (
+                              <div className="mb-4 text-right">
+                                <p className="text-[10px] font-black text-gray-400 line-through">
+                                  WAS {ticket.originalPrice} EGP
+                                </p>
+                                <p className="text-[10px] font-black text-green-500 uppercase tracking-tighter">
+                                  (Promo Applied) - {ticket.promoCodeName}
+                                </p>
+                              </div>
+                            )}
                             {ticket.status === 'active' && (
                               <div className="flex flex-col gap-2 items-end">
                                 <button

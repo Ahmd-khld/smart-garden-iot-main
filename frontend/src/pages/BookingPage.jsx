@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { socket } from '../socket';
 import WeatherWidget from '../components/WeatherWidget';
 import api from '../api';
 
@@ -98,7 +99,33 @@ const BookingPage = () => {
 
   useEffect(() => {
     fetchInsights();
-    // Poll every 60 seconds
+
+    // Listen for real-time ticket updates to refresh insights
+    const onUpdate = () => {
+      console.log('🔄 Refreshing crowd insights via socket signal');
+      fetchInsights();
+    };
+
+    socket.on('totalTicketsUpdate', onUpdate);
+    socket.on('dashboardStatsUpdated', onUpdate);
+    socket.on('crowdDataUpdated', onUpdate);
+    socket.on('dataRefresh', onUpdate);
+
+    // Connect if not connected
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    return () => {
+      socket.off('totalTicketsUpdate', onUpdate);
+      socket.off('dashboardStatsUpdated', onUpdate);
+      socket.off('crowdDataUpdated', onUpdate);
+      socket.off('dataRefresh', onUpdate);
+    };
+  }, [fetchInsights]);
+
+  useEffect(() => {
+    // Poll every 60 seconds as a fallback
     const interval = setInterval(fetchInsights, 60000);
     return () => clearInterval(interval);
   }, [fetchInsights]);
@@ -586,27 +613,59 @@ const BookingPage = () => {
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-smart-light"></div>
                   </div>
                 ) : insights ? (
-                  <div className="grid grid-cols-7 gap-2">
-                    {insights.days.map((day, index) => (
-                      <div
-                        key={index}
-                        className={`p-2 rounded-lg text-center ${day.isToday ? 'ring-2 ring-smart-light' : ''}`}
-                      >
-                        <div className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
-                          {day.dayName}
-                        </div>
+                  <div className="grid grid-cols-7 gap-3 mb-6">
+                    {insights.days.map((day, index) => {
+                      const isSelected = selectedDate === day.date;
+                      return (
                         <div
-                          className={`w-full h-8 rounded-md ${getCrowdColor(day.crowdLevel)} flex items-center justify-center`}
+                          key={index}
+                          onClick={() => setSelectedDate(day.date)}
+                          className={`flex flex-col items-center justify-center py-5 px-1 rounded-xl transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#2a3038] border-2 border-[#8cc63f] ring-2 ring-[#8cc63f]/20'
+                              : 'bg-[#1e2329] border-2 border-transparent hover:bg-[#2a3038] hover:border-white/10'
+                          }`}
                         >
-                          <span className="text-white text-xs font-bold">{day.count}</span>
+                          <div className="text-[10px] font-black text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-tighter">
+                            {day.dayName}
+                            {day.isToday && (
+                              <span className="ml-1 text-[#8cc63f]">•</span>
+                            )}
+                          </div>
+                          <div
+                            className={`text-3xl font-bold mb-1 ${
+                              day.crowdLevel === 'quiet'
+                                ? 'text-green-500'
+                                : day.crowdLevel === 'moderate'
+                                  ? 'text-yellow-500'
+                                  : 'text-red-500'
+                            }`}
+                          >
+                            {day.count}
+                          </div>
+                          <div
+                            className={`flex items-center gap-1.5 text-sm font-semibold ${
+                              day.crowdLevel === 'quiet'
+                                ? 'text-green-500'
+                                : day.crowdLevel === 'moderate'
+                                  ? 'text-yellow-500'
+                                  : 'text-red-500'
+                            }`}
+                          >
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                day.crowdLevel === 'quiet'
+                                  ? 'bg-green-500'
+                                  : day.crowdLevel === 'moderate'
+                                    ? 'bg-yellow-500'
+                                    : 'bg-red-500'
+                              }`}
+                            ></div>
+                            {day.crowdLevel === 'quiet' ? 'Quiet' : day.crowdLevel === 'moderate' ? 'Mod' : 'Busy'}
+                          </div>
                         </div>
-                        <div
-                          className={`text-xs font-bold mt-1 ${day.crowdLevel === 'quiet' ? 'text-green-600' : day.crowdLevel === 'moderate' ? 'text-yellow-600' : 'text-red-600'}`}
-                        >
-                          {getCrowdText(day.crowdLevel)}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="py-4 text-center text-smart-gray dark:text-gray-500 font-bold text-sm">

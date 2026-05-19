@@ -33,8 +33,16 @@ const MonkeyForm = ({
           <div className="title">{isLogin ? 'Visitor Login' : 'Create Account'}</div>
 
           {error && (
-            <div className="w-full mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-100">
-              {error}
+            <div className="w-full mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-100 flex flex-col gap-2">
+              <span>{error}</span>
+              {(error.includes('Access Denied') || error.includes('suspended')) && (
+                <a
+                  href="mailto:support@smartpark.com"
+                  className="bg-red-600 text-white px-3 py-1.5 rounded-md text-[10px] uppercase tracking-widest hover:bg-red-700 transition-colors inline-block w-fit"
+                >
+                  Contact Support
+                </a>
+              )}
             </div>
           )}
 

@@ -63,6 +63,14 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    if (user.isBlocked) {
+      return res.status(403).json({
+        error: `Access Denied: Your account has been suspended. Reason: ${user.blockReason || 'No reason provided.'}`,
+        isBlocked: true,
+        blockReason: user.blockReason,
+      });
+    }
+
     if (await user.matchPassword(password)) {
       res.json({
         _id: user._id,

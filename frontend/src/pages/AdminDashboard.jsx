@@ -98,6 +98,10 @@ const AdminDashboard = () => {
   const [backups, setBackups] = useState([]);
   const [isBackupsExpanded, setIsBackupsExpanded] = useState(true);
   const [restoringBackupFilename, setRestoringBackupFilename] = useState(null);
+  const [pendingCashTickets, setPendingCashTickets] = useState([]);
+  const [isLoadingPendingCash, setIsLoadingPendingCash] = useState(false);
+  const [cashSearchQuery, setCashSearchQuery] = useState('');
+  const [cashFilterStatus, setCashFilterStatus] = useState('PENDING'); // PENDING or PAID
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
 
   // Sync activeTab state with URL search params
@@ -319,6 +323,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchInsights();
+    fetchStats();
   }, [fetchInsights, syncTrigger]);
 
   const fetchStats = async () => {
@@ -684,8 +689,6 @@ const AdminDashboard = () => {
       );
 
       showModal(response.data.message || 'Simulation data generated successfully!', 'Success', 'success');
-      fetchStats();
-      fetchInsights();
       fetchUsers(userPage);
       fetchSubAdmins();
       setSyncTrigger((prev) => prev + 1);
@@ -1141,6 +1144,111 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchPendingCashTickets = async () => {
+    const token = localStorage.getItem('token');
+    if (!token || isTokenExpired(token)) return;
+    setIsLoadingPendingCash(true);
+    try {
+      const res = await api.get('/admin/pending-cash-tickets', {
+        params: { status: cashFilterStatus },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setPendingCashTickets(res.data || []);
+    } catch (err) {
+      console.error('Failed to fetch cash tickets:', err);
+    } finally {
+      setIsLoadingPendingCash(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'collections') {
+      fetchPendingCashTickets();
+
+      // JOIN ADMIN ROOM
+      socket.emit('joinAdminRoom');
+
+      const onNewCashTicket = (ticket) => {
+        // Only add if it matches current status filter (usually PENDING)
+        if (cashFilterStatus === 'PENDING') {
+          setPendingCashTickets((prev) => {
+            if (prev.find((t) => t._id === ticket._id)) return prev;
+            return [ticket, ...prev];
+          });
+        }
+      };
+
+      const onCashTicketCollected = (ticketId) => {
+        setPendingCashTickets((prev) => prev.filter((t) => t._id !== ticketId));
+      };
+
+      socket.on('newCashTicket', onNewCashTicket);
+      socket.on('cashTicketCollected', onCashTicketCollected);
+
+      // Refresh stats in real-time when any ticket is updated or collected
+      const onDashboardStatsUpdated = () => {
+        fetchStats();
+      };
+      socket.on('dashboardStatsUpdated', onDashboardStatsUpdated);
+
+      return () => {
+        socket.off('newCashTicket', onNewCashTicket);
+        socket.off('cashTicketCollected', onCashTicketCollected);
+        socket.off('dashboardStatsUpdated', onDashboardStatsUpdated);
+      };
+    }
+  }, [activeTab, cashFilterStatus]);
+
+  const filteredCashTickets = useMemo(() => {
+    return pendingCashTickets.filter((t) => {
+      const s = cashSearchQuery.toLowerCase();
+      const userName = (t.userId?.name || '').toLowerCase();
+      const userEmail = (t.userId?.email || '').toLowerCase();
+      const userPhone = (t.userId?.phone || '').toLowerCase();
+      const ticketId = t._id.toString().toLowerCase();
+
+      return (
+        userName.includes(s) ||
+        userEmail.includes(s) ||
+        userPhone.includes(s) ||
+        ticketId.includes(s)
+      );
+    });
+  }, [pendingCashTickets, cashSearchQuery]);
+
+  const handleConfirmCash = async (ticketId, amount) => {
+    const isConfirmed = await showConfirm(
+      `Confirm physical collection of ${amount} EGP for ticket ${ticketId}? This will instantly activate the ticket.`,
+      'Confirm Cash Collection'
+    );
+    if (!isConfirmed) return;
+
+    const token = localStorage.getItem('token');
+    try {
+      await api.put(
+        `/tickets/${ticketId}/confirm-cash`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      showModal('Cash collected successfully. Ticket activated.', 'Success', 'success');
+      setPendingCashTickets((prev) => prev.filter((t) => t._id !== ticketId));
+      fetchStats();
+    } catch (error) {
+      console.error('Failed to confirm cash collection:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to activate ticket.';
+      showModal(errorMessage, 'Error', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'collections') {
+      fetchPendingCashTickets();
+    }
+  }, [activeTab]);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
@@ -1168,6 +1276,8 @@ const AdminDashboard = () => {
 
     const onConnect = () => {
       console.log('✅ WebSocket Connected! Socket ID:', socket.id);
+      // JOIN ADMIN ROOM to receive real-time stat updates
+      socket.emit('joinAdminRoom');
     };
 
     const onConnectError = (err) => {
@@ -1353,9 +1463,9 @@ const AdminDashboard = () => {
 
     const onNewUserRegistered = (newUser) => {
       console.log('🆕 Received New User Registration:', newUser);
-      if (!isSuperAdmin && newUser.role === 'admin') return;
+      if (!isSuperAdmin && (newUser.role === 'admin' || newUser.role === 'sub-admin')) return;
 
-      if (newUser.role === 'admin') {
+      if (newUser.role === 'admin' || newUser.role === 'sub-admin') {
         setSubAdmins((prev) => [newUser, ...prev]);
       } else {
         setRegularUsers((prev) => {
@@ -1424,6 +1534,12 @@ const AdminDashboard = () => {
           u._id === data.userId ? { ...u, ticketCount: (u.ticketCount || 0) + data.addedCount } : u
         )
       );
+      setSyncTrigger((prev) => prev + 1);
+    };
+
+    const onDashboardStatsUpdated = () => {
+      console.log('🔄 Received Dashboard Stats Updated Signal');
+      setSyncTrigger((prev) => prev + 1);
     };
 
     socket.on('connect', onConnect);
@@ -1431,7 +1547,10 @@ const AdminDashboard = () => {
     socket.on('hardwareAlert', onHardwareAlert);
     socket.on('userTicketCountUpdate', onUserTicketUpdate);
     socket.on('occupancyUpdate', onOccupancyUpdate);
+    socket.on('occupancyUpdated', onOccupancyUpdate);
     socket.on('totalTicketsUpdate', onTotalTicketsUpdate);
+    socket.on('dashboardStatsUpdated', onDashboardStatsUpdated);
+    socket.on('crowdDataUpdated', onDashboardStatsUpdated);
     socket.on('backupsUpdate', onBackupsUpdate);
     socket.on('dataRefresh', onDataRefresh);
     socket.on('monthlySalesUpdate', onMonthlySalesUpdate);
@@ -1456,7 +1575,9 @@ const AdminDashboard = () => {
       socket.off('hardwareAlert', onHardwareAlert);
       socket.off('userTicketCountUpdate', onUserTicketUpdate);
       socket.off('occupancyUpdate', onOccupancyUpdate);
+      socket.off('occupancyUpdated', onOccupancyUpdate);
       socket.off('totalTicketsUpdate', onTotalTicketsUpdate);
+      socket.off('dashboardStatsUpdated', onDashboardStatsUpdated);
       socket.off('backupsUpdate', onBackupsUpdate);
       socket.off('dataRefresh', onDataRefresh);
       socket.off('monthlySalesUpdate', onMonthlySalesUpdate);
@@ -1842,6 +1963,11 @@ const AdminDashboard = () => {
                 icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
               },
               { id: 'hardware', label: 'Gate & Hardware', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+              {
+                id: 'collections',
+                label: 'Cash Collections',
+                icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
+              },
               ...(isSuperAdmin
                 ? [
                     {
@@ -1896,6 +2022,11 @@ const AdminDashboard = () => {
                 icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
               },
               { id: 'hardware', label: 'Gate & Hardware', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+              {
+                id: 'collections',
+                label: 'Cash Collections',
+                icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
+              },
               ...(isSuperAdmin
                 ? [
                     {
@@ -2628,30 +2759,47 @@ const AdminDashboard = () => {
                           {insights.days.map((day, index) => (
                             <div
                               key={index}
-                              className={`p-4 rounded-2xl text-center ${day.isToday ? 'ring-2 ring-smart-light bg-smart-light/5' : 'bg-smart-bg/30 dark:bg-gray-900/50'}`}
+                              className={`flex flex-col items-center justify-center py-5 px-2 rounded-xl transition-all cursor-pointer ${
+                                day.isToday
+                                  ? 'bg-[#2a3038] border-2 border-[#8cc63f]'
+                                  : 'bg-[#1e2329] border-2 border-transparent hover:bg-[#2a3038]'
+                              }`}
                             >
-                              <div className="text-xs font-black text-gray-500 dark:text-gray-400 mb-2">
+                              <div className="text-xs font-black text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-tighter">
                                 {day.dayName}
                               </div>
                               <div
-                                className={`w-full h-12 rounded-xl flex items-center justify-center ${day.crowdLevel === 'quiet' ? 'bg-green-100 dark:bg-green-900/30' : day.crowdLevel === 'moderate' ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}
+                                className={`text-3xl font-bold mb-1 ${
+                                  day.crowdLevel === 'quiet'
+                                    ? 'text-green-500'
+                                    : day.crowdLevel === 'moderate'
+                                      ? 'text-yellow-500'
+                                      : 'text-red-500'
+                                }`}
                               >
-                                <span
-                                  className={`text-lg font-black ${day.crowdLevel === 'quiet' ? 'text-green-600' : day.crowdLevel === 'moderate' ? 'text-yellow-600' : 'text-red-600'}`}
-                                >
-                                  {day.count}
-                                </span>
+                                {day.count}
                               </div>
                               <div
-                                className={`text-xs font-black mt-2 ${day.crowdLevel === 'quiet' ? 'text-green-600' : day.crowdLevel === 'moderate' ? 'text-yellow-600' : 'text-red-600'}`}
+                                className={`flex items-center gap-1.5 text-sm font-semibold ${
+                                  day.crowdLevel === 'quiet'
+                                    ? 'text-green-500'
+                                    : day.crowdLevel === 'moderate'
+                                      ? 'text-yellow-500'
+                                      : 'text-red-500'
+                                }`}
                               >
-                                {day.crowdLevel === 'quiet'
-                                  ? '🟢 Quiet'
-                                  : day.crowdLevel === 'moderate'
-                                    ? '🟡 Moderate'
-                                    : '🔴 Busy'}
+                                <div
+                                  className={`w-2 h-2 rounded-full ${
+                                    day.crowdLevel === 'quiet'
+                                      ? 'bg-green-500'
+                                      : day.crowdLevel === 'moderate'
+                                        ? 'bg-yellow-500'
+                                        : 'bg-red-500'
+                                  }`}
+                                ></div>
+                                {day.crowdLevel.charAt(0).toUpperCase() + day.crowdLevel.slice(1)}
                               </div>
-                              <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                              <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-2">
                                 {day.displayDate}
                               </div>
                             </div>
@@ -2838,6 +2986,209 @@ const AdminDashboard = () => {
                   </>
                 </WidgetErrorBoundary>
               )}
+            </div>
+          )}
+
+          {activeTab === 'collections' && (
+            <div className="mb-10 bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden transition-all duration-300">
+              <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex flex-col md:flex-row justify-between items-center gap-4">
+                <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic italic">
+                  <svg
+                    className="w-6 h-6 mr-3 text-green-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                    ></path>
+                  </svg>
+                  Cash Collections Management
+                </h2>
+                <div className="flex items-center text-smart-gray dark:text-gray-400">
+                  <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl border border-smart-light/10 mr-4">
+                    <button
+                      onClick={() => setCashFilterStatus('PENDING')}
+                      className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${cashFilterStatus === 'PENDING' ? 'bg-smart-light text-white shadow-md' : 'text-smart-gray dark:text-gray-500 hover:text-smart-dark dark:hover:text-white'}`}
+                    >
+                      Pending
+                    </button>
+                    <button
+                      onClick={() => setCashFilterStatus('PAID')}
+                      className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${cashFilterStatus === 'PAID' ? 'bg-smart-light text-white shadow-md' : 'text-smart-gray dark:text-gray-500 hover:text-smart-dark dark:hover:text-white'}`}
+                    >
+                      History
+                    </button>
+                  </div>
+                  <button
+                    onClick={fetchPendingCashTickets}
+                    className="p-2 hover:bg-smart-light/10 rounded-full transition-colors"
+                  >
+                    <svg
+                      className={`w-5 h-5 ${isLoadingPendingCash ? 'animate-spin' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      ></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Advanced Filtering & Search */}
+              <div className="bg-smart-bg/30 dark:bg-gray-900/30 px-8 py-4 border-b border-smart-light/10">
+                <div className="relative w-full">
+                  <input
+                    type="text"
+                    placeholder="SEARCH BY NAME, EMAIL, PHONE OR TICKET ID..."
+                    value={cashSearchQuery}
+                    onChange={(e) => setCashSearchQuery(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition font-mono text-xs font-black tracking-widest"
+                  />
+                  <svg
+                    className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-smart-light/60"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    ></path>
+                  </svg>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
+                {isLoadingPendingCash ? (
+                  <div className="flex justify-center items-center py-20">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-smart-light"></div>
+                  </div>
+                ) : (
+                  <table className="w-full text-left border-collapse">
+                    <thead className="sticky top-0 bg-smart-bg dark:bg-gray-900 z-10">
+                      <tr className="border-b border-smart-light/10 text-smart-gray dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                        <th className="px-6 py-4">Ticket ID</th>
+                        <th className="px-6 py-4">Customer Details</th>
+                        <th className="px-6 py-4 text-center">Amount Due</th>
+                        <th className="px-6 py-4 text-right pr-8">Status / Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
+                      {filteredCashTickets.map((ticket) => (
+                        <tr
+                          key={ticket._id}
+                          className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
+                        >
+                          <td className="px-6 py-5 font-mono text-[11px] font-black text-smart-dark dark:text-white">
+                            #{ticket._id.toString().slice(-8).toUpperCase()}
+                            <br />
+                            <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">
+                              {new Date(ticket.createdAt).toLocaleString()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-5">
+                            <div className="font-black text-smart-dark dark:text-white italic uppercase text-xs">
+                              {ticket.userId?.name || 'Unknown User'}
+                            </div>
+                            <div className="text-[10px] text-smart-gray dark:text-gray-400 font-medium">
+                              {ticket.userId?.email || 'N/A'}
+                              {ticket.userId?.phone && (
+                                <span className="ml-2 opacity-50">| {ticket.userId.phone}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-5 text-center">
+                            <span className="text-lg font-black text-smart-dark dark:text-smart-glow italic">
+                              {ticket.price}
+                              <span className="text-[10px] ml-1 not-italic opacity-60">EGP</span>
+                            </span>
+                          </td>
+                          <td className="px-6 py-5 pr-8 text-right">
+                            {ticket.paymentStatus === 'PENDING' ? (
+                              <button
+                                onClick={() => handleConfirmCash(ticket._id, ticket.price)}
+                                className="px-6 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:shadow-green-500/30 transform hover:-translate-y-0.5 active:scale-95 flex items-center justify-center ml-auto"
+                              >
+                                <svg
+                                  className="w-4 h-4 mr-2"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                                  ></path>
+                                </svg>
+                                Collect & Activate
+                              </button>
+                            ) : (
+                              <span className="bg-smart-light/10 text-smart-dark dark:text-smart-glow text-[10px] font-black px-4 py-2 rounded-xl uppercase tracking-widest border border-smart-light/20 inline-flex items-center">
+                                <svg
+                                  className="w-4 h-4 mr-2"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                                    clipRule="evenodd"
+                                  ></path>
+                                </svg>
+                                Fully Collected
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                      {filteredCashTickets.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan="4"
+                            className="p-20 text-center text-smart-gray dark:text-gray-500"
+                          >
+                            <div className="flex flex-col items-center">
+                              <svg
+                                className="w-16 h-16 mb-4 opacity-10"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth="1"
+                                  d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                                ></path>
+                              </svg>
+                              <p className="font-black uppercase tracking-widest text-xs">
+                                No cash tickets found.
+                              </p>
+                              <p className="text-[10px] mt-1 opacity-60">
+                                Try adjusting your search or filter settings.
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           )}
 

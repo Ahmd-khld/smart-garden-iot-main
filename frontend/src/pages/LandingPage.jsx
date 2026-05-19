@@ -39,7 +39,7 @@ const LandingPage = () => {
       const storedEmail = (isLogin ? email : data.email || email).toLowerCase().trim();
       localStorage.setItem('adminEmail', storedEmail);
 
-      if (data.role === 'admin') {
+      if (data.role === 'admin' || data.role === 'sub-admin') {
         navigate('/admin/dashboard');
       } else {
         navigate('/book');
@@ -173,28 +173,30 @@ const LandingPage = () => {
         </div>
 
         {/* Login/Signup Section */}
-        <div className="flex-1 flex flex-col justify-center w-full max-w-md" id="login">
-          <MonkeyForm
-            email={email}
-            setEmail={setEmail}
-            name={name}
-            setName={setName}
-            age={age}
-            setAge={setAge}
-            phone={phone}
-            setPhone={setPhone}
-            hasDisability={hasDisability}
-            setHasDisability={setHasDisability}
-            password={password}
-            setPassword={setPassword}
-            onLogin={handleAuth}
-            isLoading={isLoading}
-            error={error}
-            isLogin={isLogin}
-            setIsLogin={setIsLogin}
-            setShowForgotModal={setShowForgotModal}
-          />
-        </div>
+        {!localStorage.getItem('token') && (
+          <div className="flex-1 flex flex-col justify-center w-full max-w-md" id="login">
+            <MonkeyForm
+              email={email}
+              setEmail={setEmail}
+              name={name}
+              setName={setName}
+              age={age}
+              setAge={setAge}
+              phone={phone}
+              setPhone={setPhone}
+              hasDisability={hasDisability}
+              setHasDisability={setHasDisability}
+              password={password}
+              setPassword={setPassword}
+              onLogin={handleAuth}
+              isLoading={isLoading}
+              error={error}
+              isLogin={isLogin}
+              setIsLogin={setIsLogin}
+              setShowForgotModal={setShowForgotModal}
+            />
+          </div>
+        )}
       </main>
 
       <ForgotPasswordModal

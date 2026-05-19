@@ -24,7 +24,7 @@ const ticketSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'used', 'expired', 'cancelled'],
+      enum: ['active', 'used', 'expired', 'cancelled', 'inactive'],
       default: 'active',
     },
     validFrom: {
@@ -38,6 +38,27 @@ const ticketSchema = new mongoose.Schema(
     hasRescheduled: {
       type: Boolean,
       default: false,
+    },
+    isPromoApplied: {
+      type: Boolean,
+      default: false,
+    },
+    promoCodeName: {
+      type: String,
+      default: '',
+    },
+    originalPrice: {
+      type: Number,
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['ONLINE', 'CASH'],
+      default: 'ONLINE',
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['PAID', 'PENDING'],
+      default: 'PAID',
     },
     scanHistory: [
       {
@@ -68,6 +89,7 @@ ticketSchema.statics.countTicketsByDateRange = async function (from, to) {
         validFrom: { $gte: startOfDay, $lte: endOfDay },
         subscriptionPlan: 'one-time',
         status: { $in: ['active', 'used'] },
+        paymentStatus: 'PAID',
       },
     },
     {
@@ -111,6 +133,12 @@ const broadcastTicket = (ticket) => {
         userId: ticket.userId,
         addedCount: 1,
       });
+
+      // 3. Notify that general dashboard stats (including crowd insights) have changed
+      io.emit('dashboardStatsUpdated');
+
+      // 4. Global broadcast for crowd availability window (public & admin)
+      io.emit('crowdDataUpdated');
     }
   } catch (err) {
     // console.log('Socket broadcast skipped during initialization');

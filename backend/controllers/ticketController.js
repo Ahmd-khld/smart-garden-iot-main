@@ -130,7 +130,7 @@ const buildEmailTicketHtml = ({ user, tickets, selectedDate, subscriptionPlan })
         </div>
       </div>
       <div style="margin-left: 20px; background-color: white; padding: 8px; border-radius: 12px; border: 2px solid #111827;">
-        <img src="cid:qr-${ticket._id}" alt="QR Code" width="100" height="100" style="display: block;" />
+        <img src="cid:qr-${ticket._id.toString()}" alt="QR Code" width="100" height="100" style="display: block;" />
       </div>
     </div>
   `
@@ -231,12 +231,13 @@ const sendTicketsViaEmail = async ({ user, tickets, selectedDate, subscriptionPl
       });
 
       const qrImage = await QRCode.toBuffer(qrData);
+      const ticketIdStr = ticket._id.toString();
 
       return {
-        filename: `smart-garden-ticket-${ticket._id}.png`,
+        filename: `ticket-${ticketIdStr}.png`,
         content: qrImage,
         contentType: 'image/png',
-        cid: `qr-${ticket._id}`, // CONTENT ID for inline display
+        cid: `qr-${ticketIdStr}`, // Unique CID for this specific ticket
       };
     } catch (qrErr) {
       console.error(`Failed to generate QR for ticket ${ticket._id}:`, qrErr);
@@ -291,7 +292,10 @@ const checkout = async (req, res) => {
       useSavedCard,
       savedCardId,
       promoCode,
+      paymentMethod,
     } = req.body;
+
+    const isCashPayment = paymentMethod === 'CASH';
 
     let requestedCount = 0;
     const validTypes = ['child', 'adult', 'senior'];
@@ -371,6 +375,17 @@ const checkout = async (req, res) => {
           : parseInt(process.env.TICKET_PRICE_SENIOR_DAILY) || 150,
     };
 
+    // PROMO CODE LOGIC
+    let discountMultiplier = 1;
+    let validPromo = null;
+
+    if (promoCode) {
+      validPromo = await PromoCode.findOne({ code: promoCode.toUpperCase() });
+      if (validPromo) {
+        discountMultiplier = (100 - (validPromo.discount || 10)) / 100;
+      }
+    }
+
     for (const [type, rawCount] of Object.entries(quantities)) {
       const count = Number(rawCount);
       if (!prices[type] || count <= 0) {
@@ -390,14 +405,22 @@ const checkout = async (req, res) => {
           validUntil.setHours(23, 59, 59, 999);
         }
 
+        const originalPrice = prices[type];
+        const finalPrice = validPromo ? Math.round(originalPrice * discountMultiplier) : originalPrice;
+
         newTickets.push({
           userId: req.user._id,
           ticketType: type,
-          price: prices[type],
+          price: finalPrice,
+          originalPrice: validPromo ? originalPrice : undefined,
+          isPromoApplied: !!validPromo,
+          promoCodeName: validPromo ? validPromo.code : '',
           subscriptionPlan,
           validFrom,
           validUntil,
-          status: 'active',
+          status: isCashPayment ? 'inactive' : 'active',
+          paymentMethod: isCashPayment ? 'CASH' : 'ONLINE',
+          paymentStatus: isCashPayment ? 'PENDING' : 'PAID',
         });
       }
     }
@@ -467,8 +490,17 @@ const checkout = async (req, res) => {
           }
           io.emit('totalTicketsUpdate', { totalTicketsSold, purchasingUsers, mostSoldTicket });
 
-          const formattedSales = salesAgg
-            .map((s) => ({
+          if (isCashPayment && savedTickets.length > 0) {
+            const populatedTickets = await Ticket.find({
+              _id: { $in: savedTickets.map((t) => t._id) },
+            }).populate('userId', 'name email phone');
+
+            populatedTickets.forEach((t) => {
+              io.to('admin-room').emit('newCashTicket', t);
+            });
+          }
+
+          const formattedSales = salesAgg            .map((s) => ({
               month: new Date(s._id.year, s._id.month - 1).toLocaleString('default', {
                 month: 'short',
                 year: 'numeric',
@@ -478,6 +510,9 @@ const checkout = async (req, res) => {
             }))
             .reverse();
           io.emit('monthlySalesUpdate', formattedSales);
+
+          // Global broadcast for availability window (public & admin)
+          io.emit('crowdDataUpdated');
         }
 
         // NEW: Emit targeted update to the specific user's room for Profile page real-time refresh

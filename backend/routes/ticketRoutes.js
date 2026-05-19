@@ -8,11 +8,14 @@ const {
   rescheduleTicket,
 } = require('../controllers/ticketController');
 const { protect } = require('../middleware/authMiddleware');
+const { admin } = require('../middleware/authMiddleware');
+const { activateCashTicket } = require('../controllers/adminController');
 
 router.post('/checkout', protect, checkout);
 router.get('/history', protect, getTicketHistory);
 router.get('/insights', getTicketInsights);
 router.patch('/:id/cancel', protect, cancelTicket);
 router.put('/:id/reschedule', protect, rescheduleTicket);
+router.put('/:id/confirm-cash', protect, admin, activateCashTicket);
 
 module.exports = router;
