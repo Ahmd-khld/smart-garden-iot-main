@@ -193,7 +193,7 @@ const deleteUserProfile = async (req, res) => {
           { $limit: 1 },
         ]),
         Ticket.aggregate([
-          { $match: { status: { $ne: 'cancelled' } } },
+          { $match: { status: { $ne: 'CANCELLED' } } },
           {
             $group: {
               _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },

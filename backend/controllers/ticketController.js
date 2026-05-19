@@ -329,7 +329,7 @@ const checkout = async (req, res) => {
           userId: req.user._id,
           validFrom: { $gte: dayStart, $lte: dayEnd },
           subscriptionPlan: 'one-time',
-          status: { $in: ['active', 'used'] },
+          status: { $in: ['ACTIVE', 'USED'] },
         }),
       ]);
 
@@ -400,9 +400,9 @@ const checkout = async (req, res) => {
           validUntil.setDate(validUntil.getDate() + 30);
         } else {
           validFrom = new Date(selectedDate);
-          validFrom.setHours(0, 0, 0, 0);
+          validFrom.setUTCHours(0, 0, 0, 0);
           validUntil = new Date(selectedDate);
-          validUntil.setHours(23, 59, 59, 999);
+          validUntil.setUTCHours(23, 59, 59, 999);
         }
 
         const originalPrice = prices[type];
@@ -418,7 +418,7 @@ const checkout = async (req, res) => {
           subscriptionPlan,
           validFrom,
           validUntil,
-          status: isCashPayment ? 'inactive' : 'active',
+          status: isCashPayment ? 'INACTIVE' : 'ACTIVE',
           paymentMethod: isCashPayment ? 'CASH' : 'ONLINE',
           paymentStatus: isCashPayment ? 'PENDING' : 'PAID',
         });
@@ -454,7 +454,7 @@ const checkout = async (req, res) => {
             Ticket.countDocuments(),
             Ticket.aggregate([{ $group: { _id: '$userId' } }, { $count: 'totalPurchasingUsers' }]),
             Ticket.aggregate([
-              { $match: { status: { $ne: 'cancelled' } } },
+              { $match: { status: { $ne: 'CANCELLED' } } },
               {
                 $group: {
                   _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
@@ -521,7 +521,7 @@ const checkout = async (req, res) => {
             io.to(`user-${req.user._id}-tickets`).emit('ticketStatusChanged', {
               ticketId: ticket._id,
               userId: req.user._id,
-              status: 'active',
+              status: 'ACTIVE',
               updatedAt: ticket.createdAt,
               ticket: ticket,
             });
@@ -564,19 +564,19 @@ const getTicketHistory = async (req, res) => {
 const getTicketInsights = async (req, res) => {
   try {
     let weekStart = new Date();
-    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setUTCHours(0, 0, 0, 0);
 
     if (req.query.startDate) {
       const parsed = new Date(req.query.startDate);
       if (!isNaN(parsed.getTime())) {
         weekStart = parsed;
-        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setUTCHours(0, 0, 0, 0);
       }
     }
 
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
-    weekEnd.setHours(23, 59, 59, 999);
+    weekEnd.setUTCHours(23, 59, 59, 999);
 
     const ticketCountMap = await Ticket.countTicketsByDateRange(
       weekStart.getTime(),
@@ -624,25 +624,25 @@ const cancelTicket = async (req, res) => {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    if (ticket.status === 'expired' || ticket.validUntil < todayStart) {
-      if (ticket.status !== 'expired') {
-        ticket.status = 'expired';
+    if (ticket.status === 'EXPIRED' || ticket.validUntil < todayStart) {
+      if (ticket.status !== 'EXPIRED') {
+        ticket.status = 'EXPIRED';
         await ticket.save();
       }
       return res.status(400).json({ message: 'Cannot refund expired or past tickets' });
     }
 
-    if (ticket.status !== 'active') {
+    if (ticket.status !== 'ACTIVE') {
       return res.status(400).json({ message: 'Only active tickets can be cancelled.' });
     }
 
-    ticket.status = 'cancelled';
+    ticket.status = 'CANCELLED';
     await ticket.save();
 
     const io = req.app.get('io');
     if (io) {
       const salesAgg = await Ticket.aggregate([
-        { $match: { status: { $ne: 'cancelled' } } },
+        { $match: { status: { $ne: 'CANCELLED' } } },
         {
           $group: {
             _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } },
@@ -711,7 +711,7 @@ const rescheduleTicket = async (req, res) => {
       return res.status(400).json({ message: 'Only one-time tickets can be rescheduled' });
     }
 
-    if (ticket.status !== 'active') {
+    if (ticket.status !== 'ACTIVE') {
       return res.status(400).json({ message: 'Only active tickets can be rescheduled' });
     }
 

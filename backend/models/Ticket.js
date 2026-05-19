@@ -24,8 +24,8 @@ const ticketSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'used', 'expired', 'cancelled', 'inactive'],
-      default: 'active',
+      enum: ['ACTIVE', 'USED', 'EXPIRED', 'CANCELLED', 'INACTIVE'],
+      default: 'ACTIVE',
     },
     validFrom: {
       type: Date,
@@ -79,23 +79,25 @@ ticketSchema.index({ ticketType: 1, subscriptionPlan: 1 });
 // Query function to count tickets grouped by date for the current week window
 ticketSchema.statics.countTicketsByDateRange = async function (from, to) {
   const startOfDay = new Date(from);
-  startOfDay.setHours(0, 0, 0, 0);
+  startOfDay.setUTCHours(0, 0, 0, 0);
   const endOfDay = new Date(to);
-  endOfDay.setHours(23, 59, 59, 999);
+  endOfDay.setUTCHours(23, 59, 59, 999);
 
   const tickets = await this.aggregate([
     {
       $match: {
         validFrom: { $gte: startOfDay, $lte: endOfDay },
         subscriptionPlan: 'one-time',
-        status: { $in: ['active', 'used'] },
-        paymentStatus: 'PAID',
+        $or: [
+          { status: 'ACTIVE' },
+          { paymentStatus: 'PAID' }
+        ]
       },
     },
     {
       $group: {
         _id: {
-          $dateToString: { format: '%Y-%m-%d', date: '$validFrom' },
+          $dateToString: { format: '%Y-%m-%d', date: '$validFrom', timezone: 'UTC' },
         },
         count: { $sum: 1 },
       },

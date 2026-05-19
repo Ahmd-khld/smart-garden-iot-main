@@ -348,17 +348,15 @@ const Profile = () => {
 
               <div className="space-y-6">
                 {tickets.filter(t => {
+                  const safeStatus = t.status ? t.status.toLowerCase() : '';
                   if (historyFilter === 'all') return true;
                   if (historyFilter === 'pending') {
-                    return t.paymentMethod === 'CASH' && t.paymentStatus === 'PENDING';
+                    return t.paymentMethod === 'CASH' && t.paymentStatus?.toUpperCase() === 'PENDING';
                   }
                   if (historyFilter === 'active') {
-                    return t.status === 'active' && t.paymentStatus !== 'PENDING';
+                    return safeStatus === 'active' && t.paymentStatus?.toUpperCase() !== 'PENDING';
                   }
-                  if (historyFilter === 'used' || historyFilter === 'expired') {
-                    return t.status === historyFilter;
-                  }
-                  return t.status === historyFilter;
+                  return safeStatus === historyFilter;
                 }).length === 0 ? (
                   <div className="p-12 text-center border-2 border-dashed border-smart-light/20 rounded-3xl bg-smart-bg dark:bg-gray-700">
                     <div className="w-20 h-20 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-smart-light/10 shadow-sm">
@@ -384,16 +382,19 @@ const Profile = () => {
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     {tickets
                       .filter((t) => {
+                        const safeStatus = t.status ? t.status.toLowerCase() : '';
                         if (historyFilter === 'all') return true;
                         if (historyFilter === 'pending') {
-                          return t.paymentMethod === 'CASH' && t.paymentStatus === 'PENDING';
+                          return t.paymentMethod === 'CASH' && t.paymentStatus?.toUpperCase() === 'PENDING';
                         }
                         if (historyFilter === 'active') {
-                          return t.status === 'active' && t.paymentStatus !== 'PENDING';
+                          return safeStatus === 'active' && t.paymentStatus?.toUpperCase() !== 'PENDING';
                         }
-                        return t.status === historyFilter;
+                        return safeStatus === historyFilter;
                       })
-                      .map((ticket) => (
+                      .map((ticket) => {
+                        const safeStatus = ticket.status ? ticket.status.toLowerCase() : '';
+                        return (
                       <div
                         key={ticket._id}
                         className="bg-white dark:bg-gray-700 rounded-3xl shadow-md border border-smart-light/20 p-8 hover:shadow-lg transition-shadow flex flex-col justify-between"
@@ -402,16 +403,16 @@ const Profile = () => {
                           <div>
                             <span
                               className={`inline-block px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest shadow-sm ${
-                                ticket.status === 'active' && ticket.paymentStatus !== 'PENDING'
+                                safeStatus === 'active' && ticket.paymentStatus?.toUpperCase() !== 'PENDING'
                                   ? 'bg-smart-light/20 text-smart-dark dark:text-smart-light border border-smart-light/30'
-                                  : (ticket.paymentMethod === 'CASH' && ticket.paymentStatus === 'PENDING')
+                                  : (ticket.paymentMethod === 'CASH' && ticket.paymentStatus?.toUpperCase() === 'PENDING')
                                     ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
-                                    : ticket.status === 'used'
+                                    : safeStatus === 'used'
                                       ? 'bg-gray-100 dark:bg-gray-600 text-smart-gray dark:text-gray-400 border border-gray-200 dark:border-gray-500 opacity-60'
                                       : 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 border border-red-100 dark:border-red-900 opacity-60'
                               }`}
                             >
-                              {(ticket.paymentMethod === 'CASH' && ticket.paymentStatus === 'PENDING') ? 'Pending Cash' : ticket.status}
+                              {(ticket.paymentMethod === 'CASH' && ticket.paymentStatus?.toUpperCase() === 'PENDING') ? 'Pending Cash' : ticket.status}
                             </span>
                             <h3 className="text-2xl font-black text-smart-dark dark:text-white capitalize mt-3 italic">
                               {ticket.ticketType} Pass
@@ -437,7 +438,7 @@ const Profile = () => {
                                 </p>
                               </div>
                             )}
-                            {ticket.status === 'active' && (
+                            {ticket.status === 'ACTIVE' && (
                               <div className="flex flex-col gap-2 items-end">
                                 <button
                                   onClick={() =>
@@ -511,7 +512,8 @@ const Profile = () => {
                           </p>
                         </div>
                       </div>
-                    ))}
+                    );
+                  })}
                   </div>
                 )}
               </div>

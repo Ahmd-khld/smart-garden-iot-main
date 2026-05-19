@@ -69,18 +69,24 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
               Home
             </Link>
           )}
-          <Link to="/about" className={isActive('/about')}>
-            About Us
-          </Link>
-          <Link to="/map" className={isActive('/map')}>
-            Park Map
-          </Link>
+          {!(role === 'admin' || role === 'sub-admin') && (
+            <>
+              <Link to="/about" className={isActive('/about')}>
+                About Us
+              </Link>
+              <Link to="/map" className={isActive('/map')}>
+                Park Map
+              </Link>
+            </>
+          )}
           <Link to="/book" className={isActive('/book')}>
             Book Tickets
           </Link>
-          <Link to="/rewards" className={isActive('/rewards')}>
-            Play & Win
-          </Link>
+          {!(role === 'admin' || role === 'sub-admin') && (
+            <Link to="/rewards" className={isActive('/rewards')}>
+              Play & Win
+            </Link>
+          )}
 
           {/* Theme Toggle Button */}
           <div className="ml-2 shrink-0">
@@ -104,7 +110,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             </Link>
           )}
 
-          {isAuthenticated && (
+          {isAuthenticated && !location.pathname.includes('/admin') && (
             <button
               onClick={handleLogout}
               className="text-white/70 hover:text-white transition-colors ml-2 font-bold uppercase text-xs tracking-widest whitespace-nowrap shrink-0"

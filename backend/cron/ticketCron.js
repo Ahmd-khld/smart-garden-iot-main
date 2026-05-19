@@ -29,7 +29,7 @@ const handleExpirations = async () => {
   
   // Find tickets that are about to expire to emit events for them
   const overdueTickets = await Ticket.find({
-    status: { $ne: 'expired' },
+    status: { $ne: 'EXPIRED' },
     validUntil: { $lt: now }
   });
 
@@ -39,7 +39,7 @@ const handleExpirations = async () => {
         _id: { $in: overdueTickets.map(t => t._id) }
       },
       {
-        $set: { status: 'expired' }
+        $set: { status: 'EXPIRED' }
       }
     );
 
@@ -54,9 +54,9 @@ const handleExpirations = async () => {
             const payload = {
               ticketId: ticket._id.toString(),
               userId: ticket.userId.toString(),
-              status: 'expired',
+              status: 'EXPIRED',
               updatedAt: new Date(),
-              ticket: { ...ticket.toObject(), status: 'expired' }
+              ticket: { ...ticket.toObject(), status: 'EXPIRED' }
             };
             
             // Emit to the specific user room (Admin dashboard listeners)
@@ -75,7 +75,7 @@ const handleExpirations = async () => {
   try {
     const deletedResult = await Ticket.deleteMany({
       paymentMethod: 'CASH',
-      status: 'expired',
+      status: 'EXPIRED',
       validUntil: { $lt: yesterdayStart },
     });
     if (deletedResult.deletedCount > 0) {
@@ -98,7 +98,7 @@ const handleReminders = async () => {
   tomorrowEnd.setHours(23, 59, 59, 999);
 
   const expiringTickets = await Ticket.find({
-    status: 'active',
+    status: 'ACTIVE',
     validUntil: { $gte: tomorrowStart, $lte: tomorrowEnd }
   }).populate('userId');
 

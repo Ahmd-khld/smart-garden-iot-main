@@ -132,6 +132,7 @@ const AdminDashboard = () => {
   const [isSubAdminsExpanded, setIsSubAdminsExpanded] = useState(true);
 
   const [syncTrigger, setSyncTrigger] = useState(0);
+  const [isScanPaused, setIsScanPaused] = useState(false);
   const [backupSyncTrigger, setBackupSyncTrigger] = useState(0);
   const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0);
 
@@ -404,67 +405,88 @@ const AdminDashboard = () => {
       console.error(error);
       const errorMessage = error.response?.data?.message || 'Scan failed';
       setScanMessage({ type: 'error', text: errorMessage });
-      playErrorBuzz();
+      playErrorSound();
       if (error.response?.status === 401) {
         handleLogout();
       }
     }
   };
 
-  const playSuccessBeep = () => {
+  const playSuccessSound = () => {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!AudioContext) return;
 
       const audioCtx = new AudioContext();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
+      
+      const playNote = (freq, start, duration) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, start);
+        
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.1, start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start(start);
+        osc.stop(start + duration);
+      };
 
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-
-      oscillator.type = 'sine'; // 'sine', 'square', 'sawtooth', 'triangle'
-      oscillator.frequency.value = 800; // Frequency in Hz (higher number = higher pitch)
-      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volume (0.0 to 1.0)
-
-      oscillator.start();
-      setTimeout(() => {
-        oscillator.stop();
-        audioCtx.close();
-      }, 150); // Beep duration in ms
+      // Play a professional C5 -> G5 chime
+      playNote(523.25, audioCtx.currentTime, 0.15); // C5
+      playNote(783.99, audioCtx.currentTime + 0.1, 0.25); // G5
+      
+      setTimeout(() => audioCtx.close(), 1000);
     } catch (err) {
-      console.error('Audio beep failed', err);
+      console.error('Audio success sound failed', err);
     }
   };
 
-  const playErrorBuzz = () => {
+  const playErrorSound = () => {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!AudioContext) return;
 
       const audioCtx = new AudioContext();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
+      
+      const playBuzz = (start) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, start);
+        
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.1, start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.2);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start(start);
+        osc.stop(start + 0.2);
+      };
 
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-
-      oscillator.type = 'sawtooth'; // Rough waveform for an aggressive buzz
-      oscillator.frequency.value = 150; // Low pitch
-      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // Volume
-
-      oscillator.start();
-      setTimeout(() => {
-        oscillator.stop();
-        audioCtx.close();
-      }, 400); // 400ms duration
+      // Play a double-buzz error sound
+      playBuzz(audioCtx.currentTime);
+      playBuzz(audioCtx.currentTime + 0.25);
+      
+      setTimeout(() => audioCtx.close(), 1000);
     } catch (err) {
-      console.error('Audio buzz failed', err);
+      console.error('Audio error sound failed', err);
     }
   };
 
   const onScanSuccess = (decodedText) => {
-    playSuccessBeep();
+    if (isScanPaused) return; // Safety lock guard
+    setIsScanPaused(true); // Lock immediately
+
+    playSuccessSound();
 
     let finalId = decodedText;
 
@@ -496,6 +518,11 @@ const AdminDashboard = () => {
       handleScanRequest(cleanId);
       setManualTicketId('');
     }
+  };
+
+  const handleNextScan = () => {
+    setIsScanPaused(false);
+    setScanMessage(null);
   };
 
   const handleUnlockScanner = async () => {
@@ -4326,10 +4353,22 @@ const AdminDashboard = () => {
                   100% { background-size: 78% !important; }
                 }
               `}</style>
+                <div className="relative w-full max-w-md mx-auto">
                   <div
                     id="reader"
-                    className="w-full max-w-md mx-auto bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-[30px] shadow-2xl border-4 border-smart-dark dark:border-smart-light/50 ring-8 ring-smart-bg dark:ring-gray-900"
+                    className="w-full bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-[30px] shadow-2xl border-4 border-smart-dark dark:border-smart-light/50 ring-8 ring-smart-bg dark:ring-gray-900"
                   ></div>
+                  {isScanPaused && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-[30px]">
+                      <button
+                        onClick={handleNextScan}
+                        className="bg-blue-500 hover:bg-blue-600 text-white font-black py-4 px-10 rounded-2xl shadow-2xl transform transition hover:scale-105 active:scale-95 uppercase tracking-widest text-sm"
+                      >
+                        Next Scan
+                      </button>
+                    </div>
+                  )}
+                </div>
                 </div>
 
                 <div className="bg-smart-bg dark:bg-gray-900 p-6 sm:p-8 border-t border-smart-light/10 mt-auto w-full">

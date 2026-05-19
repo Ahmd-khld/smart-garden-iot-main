@@ -114,9 +114,9 @@ const AdminUserTickets = () => {
 
   const filteredTickets = tickets.filter((t) => {
     if (statusFilter === 'all') return true;
-    if (statusFilter === 'active') return t.status === 'active';
-    if (statusFilter === 'used') return t.status === 'used';
-    if (statusFilter === 'expired') return t.status === 'expired';
+    if (statusFilter === 'ACTIVE') return t.status === 'ACTIVE';
+    if (statusFilter === 'used') return t.status === 'USED';
+    if (statusFilter === 'expired') return t.status === 'EXPIRED';
     return true;
   });
 
@@ -184,14 +184,14 @@ const AdminUserTickets = () => {
              <div className="w-px h-8 bg-smart-light/10" />
              <div className="text-right pr-2">
                 <p className="text-[10px] font-black uppercase text-smart-gray dark:text-gray-500 tracking-widest">Active</p>
-                <p className="text-2xl font-black text-green-500 italic">{tickets.filter(t => t.status === 'active').length}</p>
+                <p className="text-2xl font-black text-green-500 italic">{tickets.filter(t => t.status === 'ACTIVE').length}</p>
              </div>
           </div>
         </div>
 
         {/* Status Filter Bar */}
         <div className="mb-8 flex flex-wrap items-center gap-3">
-          {['all', 'active', 'used', 'expired'].map((filter) => (
+          {['all', 'ACTIVE', 'used', 'expired'].map((filter) => (
             <button
               key={filter}
               onClick={() => setStatusFilter(filter)}
@@ -212,14 +212,14 @@ const AdminUserTickets = () => {
             <div
               key={ticket._id}
               className={`relative overflow-hidden rounded-[35px] border-2 transition-all duration-500 shadow-xl ${
-                ticket.status === 'active'
+                ticket.status === 'ACTIVE'
                   ? 'bg-white dark:bg-gray-800 border-smart-light/20 hover:border-smart-light shadow-smart-light/5 hover:shadow-smart-light/10'
                   : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 grayscale opacity-75'
               }`}
             >
               {/* Ticket Status Badge */}
               <div className={`absolute top-0 right-0 px-6 py-2 rounded-bl-3xl font-black text-[10px] uppercase tracking-[0.2em] italic ${
-                ticket.status === 'active' ? 'bg-smart-light text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                ticket.status === 'ACTIVE' ? 'bg-smart-light text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
               }`}>
                 {ticket.status}
               </div>
@@ -274,7 +274,7 @@ const AdminUserTickets = () => {
                   </div>
                 </div>
 
-                {ticket.status === 'active' ? (
+                {ticket.status === 'ACTIVE' ? (
                   <button
                     onClick={() => handleScanAndExpireNavigation(ticket._id)}
                     className="w-full py-4 bg-smart-dark text-white rounded-2xl font-black uppercase tracking-[0.2em] italic text-xs hover:bg-black transition-all transform hover:-translate-y-1 active:scale-95 shadow-lg shadow-black/20"

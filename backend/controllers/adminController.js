@@ -44,7 +44,7 @@ const broadcastOccupancy = async (req) => {
   const endOfDay = new Date();
   endOfDay.setHours(23, 59, 59, 999);
   const currentOccupancy = await Ticket.countDocuments({
-    status: 'used',
+    status: 'USED',
     updatedAt: { $gte: startOfDay, $lte: endOfDay },
   });
   const maxCapacity = parseInt(process.env.DAILY_CAPACITY) || 1000;
@@ -128,7 +128,7 @@ const getAdminStats = async (req, res) => {
         ]),
         User.countDocuments({ role: 'user' }),
         Ticket.aggregate([{ $group: { _id: '$userId' } }, { $count: 'totalPurchasingUsers' }]),
-        Ticket.countDocuments({ status: 'used', updatedAt: { $gte: startOfDay, $lte: endOfDay } }),
+        Ticket.countDocuments({ status: 'USED', updatedAt: { $gte: startOfDay, $lte: endOfDay } }),
       ]);
 
     let mostSoldTicket = 'None yet';
@@ -245,51 +245,72 @@ const scanTicket = async (req, res) => {
       );
     }
 
-    const now = new Date();
-    if (ticket.validFrom && now < ticket.validFrom) {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const ticketDate = new Date(ticket.validFrom);
+    ticketDate.setUTCHours(0, 0, 0, 0);
+
+    if (ticketDate.getTime() > today.getTime()) {
       return handleFailure(
-        `Premature entry attempt. Ticket valid from: ${new Date(ticket.validFrom).toLocaleDateString()}`,
+        `Premature entry attempt. Ticket valid from: ${ticketDate.toLocaleDateString()}`,
         'warning',
-        `Ticket is not valid yet. Valid starting: ${new Date(ticket.validFrom).toLocaleDateString()}`
+        `Ticket is not valid yet. Valid starting: ${ticketDate.toLocaleDateString()}`
       );
     }
-    if (ticket.validUntil && now > ticket.validUntil) {
-      if (ticket.status !== 'expired') {
-        ticket.status = 'expired';
+
+    if (ticketDate.getTime() < today.getTime() && ticket.subscriptionPlan === 'one-time') {
+      if (ticket.status !== 'EXPIRED') {
+        ticket.status = 'EXPIRED';
         await ticket.save();
       }
       return handleFailure(
         'Expired ticket scanned at Gate.',
         'warning',
-        `Ticket has expired on ${new Date(ticket.validUntil).toLocaleDateString()}`
+        `Ticket has expired on ${ticketDate.toLocaleDateString()}`
       );
     }
 
-    if (ticket.status === 'expired') {
+    if (ticket.status === 'EXPIRED') {
       return handleFailure('Expired ticket scanned at Gate.', 'warning', 'Ticket is expired');
     }
 
-    // CASH PAYMENT HANDLING
-    if (ticket.paymentStatus === 'PENDING' && ticket.paymentMethod === 'CASH') {
-      return res.status(200).json({
-        actionRequired: 'COLLECT_CASH',
-        amountToCollect: ticket.price,
-        message: 'Please collect cash to activate this ticket.',
-        ticket,
-      });
+    // STRICT STATUS & PAYMENT CHECKS
+    if (ticket.paymentStatus !== 'PAID') {
+      if (ticket.paymentMethod === 'CASH') {
+        return res.status(200).json({
+          actionRequired: 'COLLECT_CASH',
+          amountToCollect: ticket.price,
+          message: 'Please collect cash to activate this ticket.',
+          ticket,
+        });
+      }
+      return handleFailure(
+        'Unpaid ticket scanned at Gate.',
+        'error',
+        'Payment not completed for this ticket.'
+      );
     }
 
-    const subType = ticket.subscriptionType || ticket.subscriptionPlan || 'one-time';
-
-    if (subType === 'monthly') {
-      if (ticket.status !== 'active') {
+    if (ticket.status !== 'ACTIVE') {
+      if (ticket.status === 'USED') {
         return handleFailure(
-          'Inactive or revoked monthly pass scanned at Gate.',
-          'error',
-          'Monthly ticket is not active or has been revoked.'
+          'Duplicate entry attempt: Ticket already used.',
+          'warning',
+          'Ticket already scanned and used.'
         );
       }
+      return handleFailure(
+        `Invalid ticket status: ${ticket.status}`,
+        'error',
+        'Invalid ticket status'
+      );
+    }
 
+    const subType = ticket.subscriptionPlan || 'one-time';
+
+    if (subType === 'monthly') {
+      // Monthly pass logic: status must be ACTIVE, payment must be PAID
+      // We don't mark it as USED, we just add to scanHistory
       if (!ticket.scanHistory) {
         ticket.scanHistory = [];
       }
@@ -297,42 +318,27 @@ const scanTicket = async (req, res) => {
       await ticket.save();
 
       await broadcastOccupancy(req);
+      broadcastTicketStatus(req, ticket);
 
       return handleSuccess(
         'Monthly pass validated successfully at Gate.',
         'Monthly Pass Validated'
       );
     } else {
-      // Default to 'one-time' behavior
-      if (ticket.status === 'used') {
-        return handleFailure(
-          'Duplicate entry attempt: Ticket already used.',
-          'warning',
-          'Ticket already scanned and used.'
-        );
+      // One-time ticket logic: mark as USED
+      ticket.status = 'USED';
+      if (!ticket.scanHistory) {
+        ticket.scanHistory = [];
       }
+      ticket.scanHistory.push(new Date());
+      await ticket.save();
 
-      if (ticket.status === 'active') {
-        ticket.status = 'used';
-        if (!ticket.scanHistory) {
-          ticket.scanHistory = [];
-        }
-        ticket.scanHistory.push(new Date());
-        await ticket.save();
+      await broadcastOccupancy(req);
+      broadcastTicketStatus(req, ticket);
 
-        await broadcastOccupancy(req);
-        broadcastTicketStatus(req, ticket); // Add real-time broadcast
-
-        return handleSuccess(
-          'Ticket scanned successfully. Access granted.',
-          'Ticket scanned successfully. Access granted.'
-        );
-      }
-
-      return handleFailure(
-        'Invalid ticket status encountered at Gate.',
-        'error',
-        'Invalid ticket status'
+      return handleSuccess(
+        'Ticket scanned successfully. Access granted.',
+        'Ticket scanned successfully. Access granted.'
       );
     }
   } catch (error) {
@@ -508,7 +514,7 @@ const scanUserTicket = async (req, res) => {
     if (io) {
       io.to(`user-${userId}-tickets`).emit('ticketScanned', {
         ticketId: ticket._id,
-        status: 'used',
+        status: 'USED',
         updatedAt: ticket.updatedAt,
       });
     }
@@ -732,7 +738,7 @@ const deleteUser = async (req, res) => {
 
 const resetOccupancy = async (req, res) => {
   try {
-    const result = await Ticket.updateMany({ status: 'used' }, { $set: { status: 'expired' } });
+    const result = await Ticket.updateMany({ status: 'USED' }, { $set: { status: 'expired' } });
 
     await broadcastOccupancy(req);
 
@@ -1253,7 +1259,7 @@ const generateMockData = async (req, res) => {
     // 3. GENERATE TICKETS
     const ticketTypes = ['child', 'adult', 'senior'];
     const plans = ['one-time', 'monthly'];
-    const ticketStatuses = ['active', 'used', 'expired', 'cancelled'];
+    const ticketStatuses = ['ACTIVE', 'USED', 'EXPIRED', 'CANCELLED'];
     const ticketPrices = { child: 100, adult: 200, senior: 150 };
 
     const ticketDocs = [];
@@ -1310,15 +1316,15 @@ const generateMockData = async (req, res) => {
         validUntil.setHours(23, 59, 59, 999);
 
         // Logical occupancy for today vs future
-        let currentStatus = 'active';
+        let currentStatus = 'ACTIVE';
         if (d === 0) {
           // Today: Apply high occupancy rate to simulate "busy" dashboard
           if (Math.random() < SCALE.occupancyRate) {
-            currentStatus = 'used'; 
+            currentStatus = 'USED'; 
           }
         } else {
           // Future: Some may already be cancelled or used (if simulated scan history existed)
-          if (Math.random() > 0.9) currentStatus = 'cancelled';
+          if (Math.random() > 0.9) currentStatus = 'CANCELLED';
         }
 
         ticketDocs.push({
@@ -1440,9 +1446,9 @@ const activateCashTicket = async (req, res) => {
     }
 
     ticket.paymentStatus = 'PAID';
-    ticket.status = 'used'; // Counts as immediate gate entry
-    ticket.scanHistory = ticket.scanHistory || [];
-    ticket.scanHistory.push(new Date());
+    ticket.status = 'ACTIVE';
+    
+    // Explicitly save before response or emissions
     await ticket.save();
 
     // Emit targeted socket event to the user's specific room
@@ -1450,7 +1456,7 @@ const activateCashTicket = async (req, res) => {
     if (io) {
       io.to(`user-${ticket.userId}-tickets`).emit('ticketStatusChanged', {
         ticketId: ticket._id,
-        status: 'used',
+        status: 'ACTIVE',
         paymentStatus: 'PAID',
         updatedAt: ticket.updatedAt,
         ticket,
