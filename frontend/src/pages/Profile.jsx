@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
+import html2canvas from 'html2canvas';
 import { useUI } from '../context/UIContext';
 import api from '../api';
 import { socket } from '../socket';
@@ -11,9 +12,10 @@ const Profile = () => {
   const { showModal, showConfirm } = useUI();
   const [user, setUser] = useState(null);
   const [tickets, setTickets] = useState([]);
-  const [selectedQrId, setSelectedQrId] = useState(null);
+  const [selectedQrTicket, setSelectedQrTicket] = useState(null);
   const [historyFilter, setHistoryFilter] = useState('all');
   const [reschedulingTicketId, setReschedulingTicketId] = useState(null);
+  const ticketRef = useRef(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -140,7 +142,7 @@ const Profile = () => {
       );
 
       setTickets(tickets.map((t) => (t._id === ticketId ? { ...t, status: 'cancelled' } : t)));
-      if (selectedQrId === ticketId) setSelectedQrId(null);
+      if (selectedQrTicket?._id === ticketId) setSelectedQrTicket(null);
       showModal(
         'Ticket cancelled successfully! Your refund has been initiated.',
         'Success',
@@ -157,6 +159,28 @@ const Profile = () => {
 
   const handleRescheduleTicket = (ticketId) => {
     setReschedulingTicketId(ticketId);
+  };
+
+  const handleDownloadTicket = async () => {
+    if (!ticketRef.current) return;
+    
+    try {
+      const canvas = await html2canvas(ticketRef.current, {
+        backgroundColor: '#0B4228', // Matches smart-dark primary color
+        scale: 2, // Higher quality
+        logging: false,
+        useCORS: true,
+      });
+      
+      const image = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = image;
+      link.download = `SmartGarden-Ticket-${selectedQrTicket._id.slice(-8)}.png`;
+      link.click();
+    } catch (error) {
+      console.error('Download failed:', error);
+      showModal('Failed to generate ticket image. Please try again.', 'Download Error', 'error');
+    }
   };
 
   if (!user) {
@@ -397,7 +421,7 @@ const Profile = () => {
                         return (
                       <div
                         key={ticket._id}
-                        className="bg-white dark:bg-gray-700 rounded-3xl shadow-md border border-smart-light/20 p-8 hover:shadow-lg transition-shadow flex flex-col justify-between"
+                        className="bg-white dark:bg-gray-700 rounded-3xl shadow-md border border-smart-light/20 p-8 hover:shadow-lg transition-shadow flex flex-col justify-between h-full"
                       >
                         <div className="flex justify-between items-start mb-6">
                           <div>
@@ -440,19 +464,17 @@ const Profile = () => {
                             )}
                             {ticket.status === 'ACTIVE' && (
                               <button
-                                onClick={() =>
-                                  setSelectedQrId(selectedQrId === ticket._id ? null : ticket._id)
-                                }
+                                onClick={() => setSelectedQrTicket(ticket)}
                                 className="text-xs bg-smart-light hover:bg-smart-dark text-white font-black uppercase tracking-widest py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95"
                               >
-                                {selectedQrId === ticket._id ? 'Hide QR' : 'Show QR Code'}
+                                Show QR Code
                               </button>
                             )}
                           </div>
                         </div>
 
                         {ticket.status === 'ACTIVE' && (
-                          <div className="flex gap-3 mt-6 mb-4">
+                          <div className="flex gap-3 mt-auto mb-4">
                             {ticket.subscriptionPlan === 'one-time' && !ticket.hasRescheduled && (
                               <button
                                 onClick={() => handleRescheduleTicket(ticket._id)}
@@ -467,40 +489,6 @@ const Profile = () => {
                             >
                               Cancel & Refund
                             </button>
-                          </div>
-                        )}
-
-                        {selectedQrId === ticket._id && (
-                          <div className="bg-smart-bg dark:bg-gray-800 border-2 border-smart-light/20 rounded-2xl p-6 mb-6 flex flex-col items-center justify-center animate-fade-in-up">
-                            <p className="text-xs font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest mb-4">
-                              Gate Scanner QR
-                            </p>
-                            <div className="p-3 bg-white border-4 border-smart-dark rounded-xl shadow-sm mb-4">
-                              <QRCodeSVG value={ticket._id} size={150} level="H" />
-                            </div>
-                            <div className="bg-white dark:bg-gray-700 px-4 py-2 rounded-lg border border-smart-light/10 w-full max-w-xs text-center mb-4 shadow-inner">
-                              <p className="text-[10px] text-smart-gray dark:text-gray-400 font-bold uppercase tracking-widest mb-1">
-                                Ticket ID
-                              </p>
-                              <p className="font-mono text-sm font-black text-smart-dark dark:text-white select-all tracking-wider text-center">
-                                {ticket._id}
-                              </p>
-                            </div>
-                            {ticket.validFrom && (
-                              <div className="text-center w-full max-w-xs mb-2">
-                                {ticket.subscriptionPlan === 'monthly' ? (
-                                  <p className="font-semibold text-smart-dark dark:text-white text-xs">
-                                    Valid from: {new Date(ticket.validFrom).toLocaleDateString()} to{' '}
-                                    {new Date(ticket.validUntil).toLocaleDateString()}
-                                  </p>
-                                ) : (
-                                  <p className="font-semibold text-smart-light text-xs font-bold">
-                                    Valid strictly on:{' '}
-                                    {new Date(ticket.validFrom).toLocaleDateString()}
-                                  </p>
-                                )}
-                              </div>
-                            )}
                           </div>
                         )}
 
@@ -627,6 +615,86 @@ const Profile = () => {
             );
           }}
         />
+      )}
+
+      {/* QR MODAL OVERLAY */}
+      {selectedQrTicket && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-6 animate-fade-in"
+          onClick={() => setSelectedQrTicket(null)}
+        >
+          <div 
+            ref={ticketRef}
+            className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden border border-smart-light/20 transform transition-all animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-smart-dark p-8 border-b border-white/10 text-center relative">
+              <button 
+                onClick={() => setSelectedQrTicket(null)}
+                className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <h2 className="text-2xl font-black text-smart-glow italic uppercase tracking-tighter text-white">
+                Entry Pass
+              </h2>
+              <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mt-1">
+                Scan at Gate Gate Scanner
+              </p>
+            </div>
+
+            <div className="p-10 flex flex-col items-center">
+              <div className="p-4 bg-white border-[6px] border-smart-dark rounded-[30px] shadow-xl mb-8 transform hover:scale-105 transition-transform duration-500">
+                <QRCodeSVG value={selectedQrTicket._id} size={200} level="H" />
+              </div>
+
+              <div className="bg-smart-bg dark:bg-gray-700 px-6 py-4 rounded-2xl border border-smart-light/10 w-full text-center mb-6 shadow-inner">
+                <p className="text-[10px] text-smart-gray dark:text-gray-400 font-bold uppercase tracking-widest mb-1">
+                  Unique Ticket ID
+                </p>
+                <p className="font-mono text-sm font-black text-smart-dark dark:text-white select-all tracking-widest">
+                  {selectedQrTicket._id}
+                </p>
+              </div>
+
+              {selectedQrTicket.validFrom && (
+                <div className="text-center w-full mb-8">
+                  {selectedQrTicket.subscriptionPlan === 'monthly' ? (
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest">Validity Period</p>
+                      <p className="font-extrabold text-smart-dark dark:text-white text-sm">
+                        {new Date(selectedQrTicket.validFrom).toLocaleDateString()} — {new Date(selectedQrTicket.validUntil).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest">Valid Date</p>
+                      <p className="font-extrabold text-smart-light text-sm">
+                        {new Date(selectedQrTicket.validFrom).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={handleDownloadTicket}
+                className="w-full py-4 bg-smart-light hover:bg-smart-dark text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-smart-light/20 transition-all active:scale-95 mb-3"
+              >
+                Download Ticket
+              </button>
+
+              <button
+                onClick={() => setSelectedQrTicket(null)}
+                className="w-full py-4 bg-smart-dark dark:bg-smart-light text-white dark:text-smart-dark font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg hover:shadow-smart-light/20 transition-all active:scale-95"
+              >
+                Close Ticket
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

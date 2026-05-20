@@ -7,7 +7,7 @@ const WhitelistedIP = require('../models/WhitelistedIP');
 const PromoCode = require('../models/PromoCode');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
-const { exec } = require('child_process');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -1170,23 +1170,39 @@ const createBackup = (req, res) => {
   const archivePath = path.join(backupDir, `smart-park-manual-${timestamp}.gzip`);
   const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/smart-park';
 
-  const cmd = `mongodump --uri="${mongoUri}" --archive="${archivePath}" --gzip`;
+  // Use spawn instead of exec to prevent command injection
+  const child = spawn('mongodump', [
+    `--uri=${mongoUri}`,
+    `--archive=${archivePath}`,
+    '--gzip',
+  ]);
 
-  exec(cmd, async (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Manual backup failed: ${error.message}`);
+  let stderrData = '';
+  child.stderr.on('data', (data) => {
+    stderrData += data.toString();
+  });
+
+  child.on('close', async (code) => {
+    if (code !== 0) {
+      console.error(`Manual backup failed with code ${code}: ${stderrData}`);
 
       let errorMessage = 'Backup failed to complete.';
-      if (error.message.includes('not recognized') || error.message.includes('ENOENT')) {
+      if (stderrData.includes('not recognized') || stderrData.includes('ENOENT')) {
         errorMessage = 'The mongodump tool is not installed or not in your system PATH.';
       }
       return res.status(500).json({ message: errorMessage });
     }
+
     await logAdminAction(
       req,
       `Created manual database backup: smart-park-manual-${timestamp}.gzip`
     );
     res.status(200).json({ message: 'Database backed up successfully!' });
+  });
+
+  child.on('error', (err) => {
+    console.error('Failed to start backup process:', err);
+    res.status(500).json({ message: 'Failed to initiate backup process.' });
   });
 };
 

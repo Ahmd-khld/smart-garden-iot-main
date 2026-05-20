@@ -3,6 +3,9 @@ const User = require('../models/User');
 const OTP = require('../models/OTP');
 const jwt = require('jsonwebtoken');
 const { sendEmail } = require('../utils/emailService');
+const validateRequest = require('../middleware/validateRequest');
+const { loginValidationSchema } = require('../validators/schemas');
+const { authLimiter } = require('../middleware/rateLimiters');
 
 const router = express.Router();
 
@@ -96,25 +99,63 @@ router.post('/verify-email', async (req, res) => {
       return res.status(400).json({ message: 'Email and OTP are required' });
     }
 
-    const otpRecord = await OTP.findOne({ email, otp });
-    if (!otpRecord) {
-      return res.status(400).json({ message: 'Invalid or expired verification code' });
-    }
-
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    user.isVerified = true;
-    await user.save();
+    if (user.deletionDate) {
+      return res.status(403).json({
+        message: 'Account is locked and scheduled for deletion due to too many failed attempts.',
+        isLocked: true,
+      });
+    }
 
-    await OTP.deleteOne({ _id: otpRecord._id });
+    const otpRecord = await OTP.findOne({ email, otp });
 
-    res.json({
-      message: 'Email verified successfully',
-      isVerified: true,
-    });
+    if (otpRecord) {
+      user.isVerified = true;
+      user.otpAttempts = 0;
+      user.deletionDate = null;
+      user.isBlocked = false;
+      user.blockReason = '';
+      await user.save();
+
+      await OTP.deleteOne({ _id: otpRecord._id });
+
+      res.json({
+        message: 'Email verified successfully',
+        isVerified: true,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        token: generateToken(user._id),
+      });
+    } else {
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
+
+      if (user.otpAttempts >= 5) {
+        user.isBlocked = true;
+        user.blockReason =
+          'Too many failed verification attempts. Account locked for 30 days and scheduled for deletion.';
+        user.deletionDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        await user.save();
+
+        return res.status(403).json({
+          message:
+            'Max attempts reached. Your account has been locked for 30 days and is scheduled for deletion.',
+          isLocked: true,
+        });
+      }
+
+      await user.save();
+      const remaining = 5 - user.otpAttempts;
+      res.status(400).json({
+        message: `Invalid or expired verification code. ${remaining} attempts remaining.`,
+        remainingAttempts: remaining,
+      });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -123,7 +164,7 @@ router.post('/verify-email', async (req, res) => {
 // @desc    Auth user & get token
 // @route   POST /api/login
 // @access  Public
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, validateRequest(loginValidationSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -133,11 +174,14 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    if (user.isBlocked) {
+    if (user.isBlocked || user.deletionDate) {
+      const reason = user.deletionDate
+        ? 'Account locked and scheduled for deletion due to failed verification.'
+        : user.blockReason || 'No reason provided.';
       return res.status(403).json({
-        error: `Access Denied: Your account has been suspended. Reason: ${user.blockReason || 'No reason provided.'}`,
+        error: `Access Denied: ${reason}`,
         isBlocked: true,
-        blockReason: user.blockReason,
+        isLocked: !!user.deletionDate,
       });
     }
 

@@ -32,6 +32,10 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    otpAttempts: {
+      type: Number,
+      default: 0,
+    },
     isBlocked: {
       type: Boolean,
       default: false,
@@ -43,6 +47,10 @@ const userSchema = new mongoose.Schema(
     blockReason: {
       type: String,
       default: '',
+    },
+    deletionDate: {
+      type: Date,
+      default: null,
     },
     role: {
       type: String,
@@ -79,6 +87,9 @@ userSchema.pre('save', async function () {
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+// Auto-delete account after 1 month if deletionDate is set
+userSchema.index({ deletionDate: 1 }, { expireAfterSeconds: 0 });
 
 const User = mongoose.model('User', userSchema);
 module.exports = User;

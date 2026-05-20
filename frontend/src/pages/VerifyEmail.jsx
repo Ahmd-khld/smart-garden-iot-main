@@ -54,11 +54,20 @@ const VerifyEmail = () => {
 
     try {
       const response = await api.post('/verify-email', { email, otp: otpCode });
-      if (response.data.isVerified) {
-        navigate('/login', { 
-          state: { message: 'Email verified successfully! You can now login.' },
-          replace: true 
-        });
+      const data = response.data;
+
+      if (data.isVerified) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('role', data.role || 'user');
+        localStorage.setItem('userId', data._id);
+
+        if (data.role === 'admin' || data.role === 'sub-admin') {
+          const storedEmail = (data.email || email).toLowerCase().trim();
+          localStorage.setItem('adminEmail', storedEmail);
+          navigate('/admin/dashboard', { replace: true });
+        } else {
+          navigate('/', { replace: true });
+        }
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Verification failed. Please check your code.');

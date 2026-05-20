@@ -77,6 +77,15 @@ app.use(
 );
 app.use(express.json());
 
+// SAFE NOSQL SANITIZATION
+// Using manual sanitization to avoid "only a getter" errors on req.query and req.params in modern Express
+app.use((req, res, next) => {
+  if (req.body) mongoSanitize.sanitize(req.body);
+  if (req.query) mongoSanitize.sanitize(req.query);
+  if (req.params) mongoSanitize.sanitize(req.params);
+  next();
+});
+
 app.use((req, res, next) => {
   if (req.headers.cookie) {
     const parsedCookies = cookie.parse(req.headers.cookie);
@@ -84,13 +93,6 @@ app.use((req, res, next) => {
     if (token && !req.headers.authorization) {
       req.headers.authorization = `Bearer ${token}`;
     }
-  }
-  next();
-});
-
-app.use((req, res, next) => {
-  if (req.body) {
-    mongoSanitize.sanitize(req.body);
   }
   next();
 });
@@ -176,16 +178,36 @@ app.post('/api/admin/backups/:filename/restore', requireSuperAdmin, async (req, 
     }
     const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/smart-park';
     const dbName = mongoose.connection.name;
-    const restoreCmd = `mongorestore --uri="${mongoUri}" --archive="${backupPath}" --gzip --nsInclude="${dbName}.*" --drop`;
-    const { exec } = require('child_process');
-    exec(restoreCmd, async (error, stdout, stderr) => {
-      if (error) {
-        console.error('Restore Error:', stderr);
-        return res.status(500).json({ message: 'Restore failed', error: stderr });
+
+    // Use spawn instead of exec to prevent command injection
+    const { spawn } = require('child_process');
+    const child = spawn('mongorestore', [
+      `--uri=${mongoUri}`,
+      `--archive=${backupPath}`,
+      '--gzip',
+      `--nsInclude=${dbName}.*`,
+      '--drop',
+    ]);
+
+    let stderrData = '';
+    child.stderr.on('data', (data) => {
+      stderrData += data.toString();
+    });
+
+    child.on('close', async (code) => {
+      if (code !== 0) {
+        console.error('Restore Error:', stderrData);
+        return res.status(500).json({ message: 'Restore failed', error: stderrData });
       }
+
       await logAdminActionServer(req, `Restored database from backup: ${filename}`);
       if (io) io.emit('dataRefresh');
       res.status(200).json({ message: 'Database successfully restored from backup!' });
+    });
+
+    child.on('error', (err) => {
+      console.error('Failed to start restore process:', err);
+      res.status(500).json({ message: 'Failed to initiate restore process.' });
     });
   } catch (error) {
     console.error('Restore Error:', error);
