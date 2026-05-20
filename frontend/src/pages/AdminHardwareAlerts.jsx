@@ -160,12 +160,23 @@ const AdminHardwareAlerts = () => {
     socket.on('hardwareAlertsCleared', onHardwareAlertsCleared);
     socket.on('dataRefresh', onDataRefresh);
 
+    socket.on('connect_error', (err) => {
+      console.error('❌ Socket Connection Error:', err.message);
+      if (err.message.includes('Authentication error')) {
+        showModal('Session expired or unauthorized. Redirecting to login.', 'Auth Error', 'error');
+        localStorage.removeItem('token');
+        localStorage.removeItem('adminEmail');
+        navigate('/');
+      }
+    });
+
     return () => {
       // Only remove the listeners for this component, do not disconnect the socket
       socket.off('hardwareAlert', onHardwareAlert);
       socket.off('auditLogUpdate', onAuditLogUpdate);
       socket.off('hardwareAlertsCleared', onHardwareAlertsCleared);
       socket.off('dataRefresh', onDataRefresh);
+      socket.off('connect_error');
     };
   }, [fetchAlerts]);
 

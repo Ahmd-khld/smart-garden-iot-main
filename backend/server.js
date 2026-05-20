@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const cookie = require('cookie');
 const mongoSanitize = require('express-mongo-sanitize');
+const jwt = require('jsonwebtoken');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
@@ -53,6 +54,35 @@ const io = new Server(server, {
     },
     credentials: true,
   },
+});
+
+// Socket.io Authentication Middleware
+io.use(async (socket, next) => {
+  try {
+    const token = socket.handshake.auth.token || socket.handshake.headers.token;
+    if (!token) {
+      return next(new Error('Authentication error: Token missing'));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+
+    if (!user) {
+      return next(new Error('Authentication error: User not found'));
+    }
+
+    if (user.role !== 'admin' && user.role !== 'sub-admin') {
+      // User is authenticated but NOT an admin.
+      // We allow the connection so they can receive personal notifications (like ticket updates),
+      // but we will restrict joining the admin-room later in the connection handler.
+    }
+
+    socket.user = user;
+    next();
+  } catch (err) {
+    console.error('Socket Auth Error:', err.message);
+    next(new Error(`Authentication error: ${err.message}`));
+  }
 });
 
 module.exports.io = io;
@@ -218,13 +248,17 @@ app.post('/api/admin/backups/:filename/restore', requireSuperAdmin, async (req, 
 io.on('connection', (socket) => {
   // Allow admins to join any user room, and users to join their OWN room
   socket.on('joinUserRoom', (userId) => {
-    socket.join(`user-${userId}-tickets`);
-    console.log(`Socket ${socket.id} joined room: user-${userId}-tickets`);
+    if (socket.user.role === 'admin' || socket.user.role === 'sub-admin' || socket.user._id.toString() === userId) {
+      socket.join(`user-${userId}-tickets`);
+      console.log(`Socket ${socket.id} joined room: user-${userId}-tickets`);
+    }
   });
 
   socket.on('joinAdminRoom', () => {
-    socket.join('admin-room');
-    console.log(`Socket ${socket.id} joined room: admin-room`);
+    if (socket.user.role === 'admin' || socket.user.role === 'sub-admin') {
+      socket.join('admin-room');
+      console.log(`Socket ${socket.id} joined room: admin-room`);
+    }
   });
 
   socket.on('leaveUserRoom', (userId) => {
@@ -251,7 +285,8 @@ setInterval(async () => {
       timeString,
     });
     await newAlert.save();
-    io.emit('hardwareAlert', { id: newAlert._id, time: timeString, ...randomAlert });
+    // Only emit hardware alerts to the admin-room to ensure only authenticated admins see them
+    io.to('admin-room').emit('hardwareAlert', { id: newAlert._id, time: timeString, ...randomAlert });
     const isEmailConfigured = process.env.EMAIL_USER && process.env.EMAIL_USER !== 'your-email@gmail.com' && process.env.EMAIL_PASS && process.env.EMAIL_PASS !== 'your-app-password';
     if (randomAlert.type === 'error' && isEmailConfigured) {
       const adminUser = await User.findOne({ role: 'admin' });

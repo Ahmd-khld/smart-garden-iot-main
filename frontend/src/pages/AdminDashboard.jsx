@@ -1359,8 +1359,11 @@ const AdminDashboard = () => {
 
     const onConnectError = (err) => {
       console.error('❌ WebSocket Connection Error:', err.message);
+      if (err.message.includes('Authentication error')) {
+        showModal('Session expired or unauthorized. Redirecting to login.', 'Auth Error', 'error');
+        handleLogout();
+      }
     };
-
     const onHardwareAlert = (newAlert) => {
       console.log('🔔 Received Real-time Hardware Alert:', newAlert);
       const formattedAlert = {
