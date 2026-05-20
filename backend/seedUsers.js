@@ -24,6 +24,7 @@ mongoose
           password: hashedPassword,
           age: Math.floor(Math.random() * 50) + 18, // Random age between 18 and 67
           role: 'user',
+          isVerified: true,
           hasDisability: Math.random() > 0.9, // ~10% chance of having a disability
           createdAt: new Date(),
           updatedAt: new Date(),

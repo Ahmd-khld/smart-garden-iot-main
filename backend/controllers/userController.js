@@ -1,8 +1,13 @@
 const User = require('../models/User');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
 const Ticket = require('../models/Ticket');
+const OTP = require('../models/OTP');
+const { sendEmail } = require('../utils/emailService');
+
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
 
 const getUserProfile = async (req, res) => {
   try {
@@ -98,45 +103,40 @@ const forgotPassword = async (req, res) => {
       return res.status(404).json({ message: 'User with this email does not exist' });
     }
 
-    // Create reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const otpCode = generateOTP();
 
-    // Set token and expiration (1 hour)
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpires = Date.now() + 3600000;
+    // Upsert OTP for the email
+    await OTP.findOneAndUpdate(
+      { email },
+      { otp: otpCode, createdAt: Date.now() },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
-    await user.save();
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
+        <h2 style="color: #0B4228; text-align: center;">Password Reset Code</h2>
+        <p>Hello,</p>
+        <p>You requested to reset your password. Your verification code is:</p>
+        <div style="background-color: #f3f4f6; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #0B4228;">${otpCode}</span>
+        </div>
+        <p>This code will expire in 10 minutes. If you did not request this, please ignore this email.</p>
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+        <p style="font-size: 12px; color: #6b7280; text-align: center;">Smart Garden IoT System</p>
+      </div>
+    `;
 
-    // Send email
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
+    const emailResult = await sendEmail({
+      to: user.email,
+      subject: 'Password Reset Verification Code',
+      html: emailHtml,
     });
 
-    const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
-
-    const mailOptions = {
-      from: `"Smart Park" <${process.env.EMAIL_USER}>`,
-      to: user.email,
-      subject: 'Password Reset Request',
-      html: `
-                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                    <h2 style="color: #0B4228;">Smart Park Password Reset</h2>
-                    <p>You are receiving this because you (or someone else) have requested the reset of the password for your account.</p>
-                    <p>Please click on the following link, or paste this into your browser to complete the process within one hour of receiving it:</p>
-                    <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; background-color: #80C241; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
-                    <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>
-                </div>
-            `,
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    res.json({ message: 'Password reset link sent to email' });
+    if (emailResult.status === 'success') {
+      res.json({ message: 'Password reset code sent to email' });
+    } else {
+      res.status(500).json({ message: 'Failed to send reset code' });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -144,24 +144,26 @@ const forgotPassword = async (req, res) => {
 
 const resetPassword = async (req, res) => {
   try {
-    const { token, password } = req.body;
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const { email, otp, password } = req.body;
 
-    const user = await User.findOne({
-      resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() },
-    });
+    const otpRecord = await OTP.findOne({ email, otp });
+
+    if (!otpRecord) {
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+
+    const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(400).json({ message: 'Password reset token is invalid or has expired' });
+      return res.status(404).json({ message: 'User not found' });
     }
 
     // Set new password
-    user.password = password; // Hashing is handled by the User model's pre-save middleware
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-
+    user.password = password; // Hashing is handled by pre-save middleware
     await user.save();
+
+    // Delete OTP after successful reset
+    await OTP.deleteOne({ _id: otpRecord._id });
 
     res.json({ message: 'Password has been reset successfully' });
   } catch (error) {

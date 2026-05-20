@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../api';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,7 +17,10 @@ const ForgotPassword = () => {
       const response = await api.post('/users/forgot-password', { email });
 
       if (response.status === 200) {
-        setMessage({ type: 'success', text: 'Password reset link sent! Please check your email.' });
+        setMessage({ type: 'success', text: 'Verification code sent! Redirecting...' });
+        setTimeout(() => {
+          navigate(`/reset-password/${email}`);
+        }, 2000);
       } else {
         setMessage({
           type: 'error',

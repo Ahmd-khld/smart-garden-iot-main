@@ -28,6 +28,7 @@ const userRoutes = require('./routes/userRoutes');
 const authRoutes = require('./routes/authRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const promoRoutes = require('./routes/promoRoutes');
+const otpRoutes = require('./routes/otpRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -119,6 +120,7 @@ const initAdmin = async () => {
         password: adminPassword,
         age: 30,
         role: 'admin',
+        isVerified: true,
         hasDisability: false,
       });
       console.log('Admin user verified/created');
@@ -151,6 +153,7 @@ app.use('/api/tickets', ticketRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/promo', promoRoutes);
+app.use('/api/otp', otpRoutes);
 
 app.delete('/api/admin/clear-dummy-tickets', requireSuperAdmin, async (req, res) => {
   try {

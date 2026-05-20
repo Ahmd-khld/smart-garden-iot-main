@@ -13,6 +13,7 @@ import ParkMap from './pages/ParkMap';
 import ResetPassword from './pages/ResetPassword';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
+import VerifyEmail from './pages/VerifyEmail';
 import GamePage from './pages/GamePage';
 import { Navigate } from 'react-router-dom';
 import { socket } from './socket';
@@ -115,6 +116,7 @@ function App() {
             <Route path="/map" element={<ParkMap />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
             <Route
               path="/admin/dashboard"

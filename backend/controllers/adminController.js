@@ -1323,6 +1323,7 @@ const generateMockData = async (req, res) => {
         password: hashedPassword,
         age: Math.floor(Math.random() * 60 + 18),
         role: isLastFew ? 'admin' : 'user',
+        isVerified: true,
         isBlocked: !isLastFew && Math.random() > 0.95,
         hasDisability: Math.random() > 0.9,
       });

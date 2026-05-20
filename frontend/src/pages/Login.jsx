@@ -6,6 +6,11 @@ import api from '../api';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [age, setAge] = useState('');
+  const [phone, setPhone] = useState('');
+  const [hasDisability, setHasDisability] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -20,16 +25,31 @@ const Login = () => {
       // Clean up the URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+
+    if (location.state?.message) {
+      setError(location.state.message);
+    }
   }, [location]);
 
-  const handleLogin = async (e) => {
+  const handleAuth = async (e) => {
     if (e) e.preventDefault();
     setError('');
     setIsLoading(true);
 
+    const path = isLogin ? '/login' : '/register';
+    const payload = isLogin
+      ? { email, password }
+      : { name, email, phone, age: Number(age), hasDisability, password, role: 'user' };
+
     try {
-      const response = await api.post('/login', { email, password });
+      const response = await api.post(path, payload);
       const data = response.data;
+
+      if (!isLogin) {
+        // Registration success - redirect to verification
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('role', data.role || 'user');
@@ -45,6 +65,11 @@ const Login = () => {
         navigate('/book');
       }
     } catch (err) {
+      if (err.response?.status === 401 && err.response?.data?.isVerified === false) {
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
+
       setError(
         err.response?.data?.message ||
           err.response?.data?.error ||
@@ -62,8 +87,17 @@ const Login = () => {
         setEmail={setEmail}
         password={password}
         setPassword={setPassword}
-        onLogin={handleLogin}
-        isLogin={true}
+        name={name}
+        setName={setName}
+        age={age}
+        setAge={setAge}
+        phone={phone}
+        setPhone={setPhone}
+        hasDisability={hasDisability}
+        setHasDisability={setHasDisability}
+        onLogin={handleAuth}
+        isLogin={isLogin}
+        setIsLogin={setIsLogin}
         isLoading={isLoading}
         error={error}
       />

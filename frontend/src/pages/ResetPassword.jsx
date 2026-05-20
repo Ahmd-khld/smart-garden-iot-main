@@ -1,18 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 
 const ResetPassword = () => {
-  const { token } = useParams();
+  const { token: emailParam } = useParams(); // URL path can be /reset-password/:email
   const navigate = useNavigate();
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
   const [isLoading, setIsLoading] = useState(false);
 
+  const handleChangeOtp = (element, index) => {
+    if (isNaN(element.value)) return false;
+    setOtp([...otp.map((d, idx) => (idx === index ? element.value : d))]);
+    if (element.nextSibling && element.value !== '') {
+      element.nextSibling.focus();
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage({ type: '', text: '' });
+
+    const otpCode = otp.join('');
+    if (otpCode.length !== 6) {
+      setMessage({ type: 'error', text: 'Please enter the 6-digit verification code.' });
+      return;
+    }
 
     if (password !== confirmPassword) {
       setMessage({ type: 'error', text: 'Passwords do not match.' });
@@ -27,7 +42,11 @@ const ResetPassword = () => {
     setIsLoading(true);
 
     try {
-      const response = await api.post('/users/reset-password', { token, password });
+      const response = await api.post('/users/reset-password', { 
+        email: emailParam, 
+        otp: otpCode, 
+        password 
+      });
 
       if (response.status === 200) {
         setMessage({
@@ -35,15 +54,13 @@ const ResetPassword = () => {
           text: 'Password reset successfully! Redirecting to login...',
         });
         setTimeout(() => {
-          navigate('/');
+          navigate('/login');
         }, 3000);
-      } else {
-        setMessage({ type: 'error', text: response.data?.message || 'Failed to reset password.' });
       }
     } catch (err) {
       setMessage({
         type: 'error',
-        text: err.response?.data?.message || 'Server connection failed.',
+        text: err.response?.data?.message || 'Failed to reset password. Check your code.',
       });
     } finally {
       setIsLoading(false);
@@ -55,10 +72,10 @@ const ResetPassword = () => {
       <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden border border-smart-light/20 transform transition-all animate-fade-in">
         <div className="bg-smart-dark p-8 border-b border-white/10">
           <h2 className="text-3xl font-black text-smart-glow italic uppercase tracking-tighter text-white text-center">
-            Set New Password
+            Reset Password
           </h2>
           <p className="text-white/60 text-center text-xs font-bold uppercase tracking-widest mt-2">
-            Smart Park Security
+            Verification for {emailParam}
           </p>
         </div>
 
@@ -72,6 +89,25 @@ const ResetPassword = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label className="block text-xs font-black text-smart-dark dark:text-white mb-3 uppercase tracking-widest text-center">
+                6-Digit Verification Code
+              </label>
+              <div className="flex justify-between gap-2 mb-6">
+                {otp.map((data, index) => (
+                  <input
+                    key={index}
+                    type="text"
+                    maxLength="1"
+                    className="w-11 h-12 border-2 border-[#80C241]/30 rounded-xl text-center text-xl font-black bg-[#f4fbf2] dark:bg-gray-700 text-[#0B4228] dark:text-white focus:border-[#80C241] outline-none transition-all"
+                    value={data}
+                    onChange={(e) => handleChangeOtp(e.target, index)}
+                    onFocus={(e) => e.target.select()}
+                  />
+                ))}
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-black text-smart-dark dark:text-white mb-3 uppercase tracking-widest">
                 New Password

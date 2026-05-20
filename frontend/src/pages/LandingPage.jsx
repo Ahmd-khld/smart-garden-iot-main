@@ -34,6 +34,12 @@ const LandingPage = () => {
       const response = await api.post(path, payload);
       const data = response.data;
 
+      if (!isLogin) {
+        // Registration success - redirect to verification
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
+
       localStorage.setItem('token', data.token);
       localStorage.setItem('role', data.role || 'user');
       const storedEmail = (isLogin ? email : data.email || email).toLowerCase().trim();
@@ -45,6 +51,11 @@ const LandingPage = () => {
         navigate('/book');
       }
     } catch (err) {
+      if (err.response?.status === 401 && err.response?.data?.isVerified === false) {
+        navigate(`/verify-email?email=${encodeURIComponent(email)}`);
+        return;
+      }
+
       const errorMessage =
         err.response?.data?.message ||
         err.response?.data?.error ||
@@ -66,13 +77,16 @@ const LandingPage = () => {
       if (response.status === 200) {
         setForgotMessage({
           type: 'success',
-          text: 'Reset link sent! Please check your email inbox.',
+          text: 'Verification code sent! Redirecting...',
         });
-        setForgotEmail('');
+        setTimeout(() => {
+          setShowForgotModal(false);
+          navigate(`/reset-password/${forgotEmail}`);
+        }, 2000);
       } else {
         setForgotMessage({
           type: 'error',
-          text: response.data?.message || 'Failed to send reset link.',
+          text: response.data?.message || 'Failed to send reset code.',
         });
       }
     } catch (err) {
