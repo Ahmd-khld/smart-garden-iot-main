@@ -600,6 +600,11 @@ const getTicketInsights = async (req, res) => {
       });
     }
 
+    // Prevent Response Caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     res.json({
       weekStart: weekStart.toISOString(),
       weekEnd: weekEnd.toISOString(),

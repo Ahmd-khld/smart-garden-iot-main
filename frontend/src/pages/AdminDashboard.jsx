@@ -46,6 +46,7 @@ const AdminDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [stats, setStats] = useState(null);
   const [isLoadingStats, setIsLoadingStats] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const superAdminEmail = (import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase();
   const currentAdminEmail = (localStorage.getItem('adminEmail') || '').toLowerCase().trim();
   const isSuperAdmin = currentAdminEmail === superAdminEmail;
@@ -1219,6 +1220,21 @@ const AdminDashboard = () => {
       console.error('Failed to fetch cash tickets:', err);
     } finally {
       setIsLoadingPendingCash(false);
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      if (activeTab === 'overview') {
+        await Promise.all([fetchStats(), fetchInsights()]);
+      } else if (activeTab === 'collections') {
+        await fetchPendingCashTickets();
+      }
+    } catch (err) {
+      console.error('Manual refresh failed:', err);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -2498,6 +2514,34 @@ const AdminDashboard = () => {
 
           {activeTab === 'overview' && (
             <>
+              <div className="flex justify-between items-center mb-8 animate-fade-in-up">
+                <h2 className="text-2xl font-black text-smart-dark dark:text-white uppercase italic tracking-tighter flex items-center">
+                  <svg className="w-8 h-8 mr-3 text-smart-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                  </svg>
+                  System Overview
+                </h2>
+                <button
+                  onClick={handleManualRefresh}
+                  disabled={isRefreshing}
+                  className="group flex items-center px-6 py-3 bg-white dark:bg-gray-800 border-2 border-smart-light/20 rounded-2xl text-[10px] font-black uppercase tracking-widest text-smart-gray dark:text-gray-400 hover:text-smart-dark dark:hover:text-white hover:border-smart-light transition-all shadow-xl hover:shadow-smart-light/20 active:scale-95 disabled:opacity-50"
+                >
+                  <svg
+                    className={`w-5 h-5 mr-3 transition-transform duration-500 ${isRefreshing ? 'animate-spin text-smart-light' : 'group-hover:rotate-180'}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    ></path>
+                  </svg>
+                  {isRefreshing ? 'Syncing Ecosystem...' : 'Refresh Live Data'}
+                </button>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 mb-10 animate-fade-in-up">
                 {/* Circular Card 1 */}
                 <div className="relative bg-white dark:bg-gray-800 rounded-full w-[250px] h-[250px] flex flex-col items-center justify-center p-6 shadow-[0_10px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)] border-[10px] border-blue-500/20 hover:border-blue-500/40 transition-all transform hover:scale-105 mx-auto text-center group shrink-0">
@@ -3105,11 +3149,12 @@ const AdminDashboard = () => {
                     </button>
                   </div>
                   <button
-                    onClick={fetchPendingCashTickets}
-                    className="p-2 hover:bg-smart-light/10 rounded-full transition-colors"
+                    onClick={handleManualRefresh}
+                    disabled={isRefreshing}
+                    className="p-2 hover:bg-smart-light/10 rounded-full transition-colors disabled:opacity-50"
                   >
                     <svg
-                      className={`w-5 h-5 ${isLoadingPendingCash ? 'animate-spin' : ''}`}
+                      className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`}
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"

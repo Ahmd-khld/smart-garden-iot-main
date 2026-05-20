@@ -43,9 +43,15 @@ const broadcastOccupancy = async (req) => {
   startOfDay.setHours(0, 0, 0, 0);
   const endOfDay = new Date();
   endOfDay.setHours(23, 59, 59, 999);
+
+  // Robust occupancy calculation:
+  // 1. One-time tickets marked as 'USED' today
+  // 2. Monthly passes with a scan entry recorded today
   const currentOccupancy = await Ticket.countDocuments({
-    status: 'USED',
-    updatedAt: { $gte: startOfDay, $lte: endOfDay },
+    $or: [
+      { status: 'USED', updatedAt: { $gte: startOfDay, $lte: endOfDay } },
+      { scanHistory: { $elemMatch: { $gte: startOfDay, $lte: endOfDay } } },
+    ],
   });
   const maxCapacity = parseInt(process.env.DAILY_CAPACITY) || 1000;
   const capacityPercentage = Math.round((currentOccupancy / maxCapacity) * 100);
@@ -128,7 +134,12 @@ const getAdminStats = async (req, res) => {
         ]),
         User.countDocuments({ role: 'user' }),
         Ticket.aggregate([{ $group: { _id: '$userId' } }, { $count: 'totalPurchasingUsers' }]),
-        Ticket.countDocuments({ status: 'USED', updatedAt: { $gte: startOfDay, $lte: endOfDay } }),
+        Ticket.countDocuments({
+          $or: [
+            { status: 'USED', updatedAt: { $gte: startOfDay, $lte: endOfDay } },
+            { scanHistory: { $elemMatch: { $gte: startOfDay, $lte: endOfDay } } },
+          ],
+        }),
       ]);
 
     let mostSoldTicket = 'None yet';
@@ -145,6 +156,11 @@ const getAdminStats = async (req, res) => {
       purchasingUsersAgg.length > 0 ? purchasingUsersAgg[0].totalPurchasingUsers : 0;
     const maxCapacity = parseInt(process.env.DAILY_CAPACITY) || 1000;
     const capacityPercentage = Math.round((currentOccupancy / maxCapacity) * 100);
+
+    // Prevent Response Caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     res.status(200).json({
       totalTicketsSold,
@@ -513,7 +529,7 @@ const scanUserTicket = async (req, res) => {
       });
     }
 
-    ticket.status = 'used';
+    ticket.status = 'USED';
     ticket.scanHistory = ticket.scanHistory || [];
     ticket.scanHistory.push(new Date());
     await ticket.save();
@@ -794,7 +810,7 @@ const deleteUser = async (req, res) => {
 
 const resetOccupancy = async (req, res) => {
   try {
-    const result = await Ticket.updateMany({ status: 'USED' }, { $set: { status: 'expired' } });
+    const result = await Ticket.updateMany({ status: 'USED' }, { $set: { status: 'EXPIRED' } });
 
     await broadcastOccupancy(req);
 
@@ -1069,6 +1085,11 @@ const getMonthlySales = async (req, res) => {
         revenue: s.revenue,
       }))
       .reverse(); // Reverse for chronological order (left to right) in the chart
+
+    // Prevent Response Caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     res.status(200).json(formattedSales);
   } catch (error) {
@@ -1504,6 +1525,10 @@ const activateCashTicket = async (req, res) => {
     ticket.paymentStatus = 'PAID';
     ticket.status = 'ACTIVE';
     
+    // Increment Occupancy: Add a scan entry for today to signify arrival/check-in
+    if (!ticket.scanHistory) ticket.scanHistory = [];
+    ticket.scanHistory.push(new Date());
+
     // Explicitly save before response or emissions
     await ticket.save();
 
@@ -1553,6 +1578,11 @@ const getPendingCashTickets = async (req, res) => {
       .populate('userId', 'name email phone')
       .sort({ createdAt: -1 })
       .lean();
+
+    // Prevent Response Caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
 
     res.status(200).json(tickets);
   } catch (error) {
