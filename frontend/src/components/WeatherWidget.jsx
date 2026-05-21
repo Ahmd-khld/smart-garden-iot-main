@@ -4,6 +4,7 @@ import styled from 'styled-components';
 const WeatherWidget = () => {
   const [weather, setWeather] = useState(null);
   const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -24,11 +25,36 @@ const WeatherWidget = () => {
       } catch (err) {
         console.error('Weather fetch error:', err);
         setHasError(true);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchWeather();
   }, []);
+
+  if (isLoading) {
+    return (
+      <div className="w-[280px] h-[280px] bg-slate-800/80 animate-pulse rounded-[36px] flex flex-col justify-between p-8 border border-white/5 shadow-2xl backdrop-blur-sm">
+        <div className="flex justify-between items-start">
+          {/* Temperature Placeholder */}
+          <div className="w-20 h-16 bg-slate-700/50 rounded-2xl animate-pulse" />
+          {/* Sun Icon Placeholder */}
+          <div className="w-12 h-12 bg-slate-700/50 rounded-lg animate-pulse" />
+        </div>
+        
+        {/* Status Text Placeholder */}
+        <div className="w-32 h-6 bg-slate-700/50 rounded-md animate-pulse -mt-4" />
+        
+        {/* Forecast Rows Placeholder */}
+        <div className="flex justify-between items-end gap-3 mt-4">
+          <div className="flex-1 h-12 bg-slate-700/50 rounded-xl animate-pulse" />
+          <div className="flex-1 h-12 bg-slate-700/50 rounded-xl animate-pulse" />
+          <div className="flex-1 h-12 bg-slate-700/50 rounded-xl animate-pulse" />
+        </div>
+      </div>
+    );
+  }
 
   if (hasError || !weather) return null;
 

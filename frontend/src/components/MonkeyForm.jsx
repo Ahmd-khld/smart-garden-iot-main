@@ -247,6 +247,12 @@ const StyledWrapper = styled.div`
     padding: var(--p);
     font-family:
       'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+
+    @media (max-width: 480px) {
+      --p: 24px;
+      --w-form: 100%;
+      border-radius: 16px;
+    }
   }
 
   .avatar {
@@ -270,6 +276,11 @@ const StyledWrapper = styled.div`
     justify-content: center;
     align-items: center;
     --sz-svg: calc(var(--sz-avatar) - 10px);
+
+    @media (max-width: 480px) {
+      --sz-avatar: 130px;
+      margin-bottom: 1rem;
+    }
   }
   .avatar svg {
     position: absolute;

@@ -90,7 +90,7 @@ const GamePage = () => {
     return () => clearInterval(timer);
   }, [gameState]);
 
-  // 3. Keyboard Input
+  // 3. Keyboard & Touch Input
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (gameState !== 'playing') return;
@@ -103,6 +103,16 @@ const GamePage = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gameState]);
+
+  const moveLeft = () => {
+    if (gameState !== 'playing') return;
+    basketPosRef.current = Math.max(0, basketPosRef.current - 45);
+  };
+
+  const moveRight = () => {
+    if (gameState !== 'playing') return;
+    basketPosRef.current = Math.min(GAME_WIDTH - BASKET_WIDTH, basketPosRef.current + 45);
+  };
 
   // 4. Main Animation Loop (Movement, Difficulty, Collision)
   const gameLoop = (time) => {

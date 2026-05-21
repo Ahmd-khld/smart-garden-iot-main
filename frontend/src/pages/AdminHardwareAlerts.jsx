@@ -262,12 +262,12 @@ const AdminHardwareAlerts = () => {
         onAuditClick={onAuditClick}
       />
 
-      <main className="flex-grow max-w-5xl mx-auto px-6 py-10 w-full">
-        <div className="bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden flex flex-col h-[80vh]">
-          <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center">
-            <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic">
+      <main className="flex-grow max-w-5xl mx-auto px-4 md:px-6 py-6 md:py-10 w-full">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl md:rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden flex flex-col h-[85vh] md:h-[80vh]">
+          <div className="bg-smart-bg dark:bg-gray-900 px-6 md:px-8 py-4 md:py-6 border-b border-smart-light/10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <h2 className="text-lg md:text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic">
               <svg
-                className="w-6 h-6 mr-3 text-smart-light"
+                className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-smart-light"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -279,71 +279,44 @@ const AdminHardwareAlerts = () => {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 ></path>
               </svg>
-              Historical Alerts ({filteredAlerts.length})
+              Logs ({filteredAlerts.length})
             </h2>
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full lg:w-auto">
               <button
                 onClick={handleExportCSV}
                 className="hidden sm:flex items-center px-3 py-2 bg-smart-light/10 hover:bg-smart-light/20 text-smart-light rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors border border-smart-light/20"
                 disabled={filteredAlerts.length === 0}
               >
-                <svg
-                  className="w-3 h-3 mr-1.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  ></path>
-                </svg>
                 Export CSV
               </button>
-              {isSuperAdmin && (
-                <>
-                  <button
-                    onClick={() => handleClearAlerts(30)}
-                    className="hidden sm:flex items-center px-3 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors border border-yellow-500/20"
-                    disabled={alerts.length === 0}
-                  >
-                    Clear &gt; 30 Days
-                  </button>
-                  <button
-                    onClick={() => handleClearAlerts(null)}
-                    className="hidden sm:flex items-center px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors border border-red-500/20"
-                    disabled={alerts.length === 0}
-                  >
-                    Clear All
-                  </button>
-                </>
-              )}
-              <input
-                type="date"
-                value={filterDate}
-                onChange={(e) => {
-                  setFilterDate(e.target.value);
-                  setPage(1); // Reset pagination when searching a new date
-                }}
-                className="px-4 py-2 rounded-xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white focus:ring-2 focus:ring-smart-light/50 outline-none transition font-mono text-[10px] font-black tracking-widest cursor-pointer"
-              />
-              <select
-                value={filterType}
-                onChange={(e) => {
-                  setFilterType(e.target.value);
-                  setPage(1); // Reset pagination when searching a new type
-                }}
-                className="px-4 py-2 rounded-xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white focus:ring-2 focus:ring-smart-light/50 outline-none transition font-mono text-[10px] font-black tracking-widest cursor-pointer"
-              >
-                <option value="all">ALL ALERTS</option>
-                <option value="warning">WARNINGS</option>
-                <option value="info">INFO</option>
-                <option value="action">ACTIONS</option>
-                <option value="success">SUCCESS</option>
-                <option value="error">ERRORS</option>
-              </select>
+              
+              <div className="flex gap-2 w-full sm:w-auto">
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => {
+                    setFilterDate(e.target.value);
+                    setPage(1);
+                  }}
+                  className="flex-1 sm:w-32 px-3 py-2 rounded-xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white focus:ring-2 focus:ring-smart-light/50 outline-none transition font-mono text-[9px] md:text-[10px] font-black tracking-widest cursor-pointer"
+                />
+                <select
+                  value={filterType}
+                  onChange={(e) => {
+                    setFilterType(e.target.value);
+                    setPage(1);
+                  }}
+                  className="flex-1 sm:w-32 px-3 py-2 rounded-xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white focus:ring-2 focus:ring-smart-light/50 outline-none transition font-mono text-[9px] md:text-[10px] font-black tracking-widest cursor-pointer"
+                >
+                  <option value="all">ALL</option>
+                  <option value="warning">WARN</option>
+                  <option value="info">INFO</option>
+                  <option value="action">ACT</option>
+                  <option value="success">SUCC</option>
+                  <option value="error">ERR</option>
+                </select>
+              </div>
+
               {(filterDate || filterType !== 'all') && (
                 <button
                   onClick={() => {
@@ -353,114 +326,99 @@ const AdminHardwareAlerts = () => {
                   }}
                   className="px-3 py-2 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-colors border border-red-200 dark:border-red-800"
                 >
-                  Clear
+                  Reset
                 </button>
               )}
             </div>
           </div>
-          <div className="flex-grow overflow-y-auto">
+          <div className="flex-grow overflow-auto">
             {loading ? (
               <div className="flex justify-center items-center h-full">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-smart-light"></div>
               </div>
             ) : (
-              <table className="w-full text-left border-collapse">
-                <thead className="sticky top-0 bg-smart-bg dark:bg-gray-900 z-10">
-                  <tr className="border-b border-smart-light/10 text-smart-gray dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">
-                    <th className="px-4 py-3 pl-8 whitespace-nowrap text-left w-1/4">
-                      Date &amp; Time
-                    </th>
-                    <th className="px-4 py-3 whitespace-nowrap text-left w-[100px]">Type</th>
-                    <th className="px-4 py-3 w-full">Alert Message</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                  {filteredAlerts.map((alert) => (
-                    <tr
-                      key={alert._id || alert.id}
-                      className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
-                    >
-                      <td className="px-4 py-3 pl-8 whitespace-nowrap align-top">
-                        <div className="text-sm font-bold text-smart-dark dark:text-gray-300">
-                          {alert.timeString || alert.time}
-                        </div>
-                        <div className="text-xs font-bold text-smart-gray dark:text-gray-500 uppercase mt-0.5">
-                          {new Date(alert.createdAt).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap align-top">
-                        {alert.type === 'warning' && (
-                          <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider border border-yellow-200 dark:border-yellow-800 inline-block w-[72px] text-center">
-                            Warning
-                          </span>
-                        )}
-                        {alert.type === 'info' && (
-                          <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider border border-blue-200 dark:border-blue-800 inline-block w-[72px] text-center">
-                            Info
-                          </span>
-                        )}
-                        {alert.type === 'action' && (
-                          <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider border border-smart-light/20 inline-block w-[72px] text-center">
-                            Action
-                          </span>
-                        )}
-                        {alert.type === 'success' && (
-                          <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider border border-green-200 dark:border-green-800 inline-block w-[72px] text-center">
-                            Success
-                          </span>
-                        )}
-                        {alert.type === 'error' && (
-                          <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider border border-red-200 dark:border-red-800 inline-block w-[72px] text-center">
-                            Error
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-smart-dark dark:text-gray-200 font-medium text-sm leading-relaxed break-words align-top">
-                        {alert.message}
-                      </td>
+              <div className="min-w-[600px] lg:min-w-0">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-smart-bg dark:bg-gray-900 z-10">
+                    <tr className="border-b border-smart-light/10 text-smart-gray dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                      <th className="px-4 py-3 pl-6 md:pl-8 whitespace-nowrap text-left w-1/4">
+                        Time
+                      </th>
+                      <th className="px-4 py-3 whitespace-nowrap text-left w-[80px] md:w-[100px]">Type</th>
+                      <th className="px-4 py-3 w-full">Message</th>
                     </tr>
-                  ))}
-                  {filteredAlerts.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan="3"
-                        className="p-8 text-center text-smart-gray dark:text-gray-500 font-black uppercase tracking-widest text-[10px]"
+                  </thead>
+                  <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
+                    {filteredAlerts.map((alert) => (
+                      <tr
+                        key={alert._id || alert.id}
+                        className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
                       >
-                        No alerts match the selected filter.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
-            {totalPages > 1 && !loading && (
-              <div className="bg-smart-bg/30 dark:bg-gray-900/30 px-6 py-4 border-t border-smart-light/10 flex flex-col sm:flex-row justify-between items-center gap-4 mt-auto">
-                <span className="text-[10px] font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest text-center sm:text-left w-full sm:w-1/3">
-                  Showing {(page - 1) * 50 + 1} to {Math.min(page * 50, totalAlertsCount)} of{' '}
-                  {totalAlertsCount}
-                </span>
-                <div className="flex space-x-2 items-center justify-center sm:justify-end w-full sm:w-2/3">
-                  <button
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-smart-light/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-smart-light/10"
-                  >
-                    Prev
-                  </button>
-                  <span className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-smart-dark dark:text-white flex items-center">
-                    Page {page} of {totalPages}
-                  </span>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page >= totalPages}
-                    className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-smart-light/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-smart-light/10"
-                  >
-                    Next
-                  </button>
-                </div>
+                        <td className="px-4 py-3 pl-6 md:pl-8 whitespace-nowrap align-top">
+                          <div className="text-xs md:text-sm font-bold text-smart-dark dark:text-gray-300">
+                            {alert.timeString || alert.time}
+                          </div>
+                          <div className="text-[10px] font-bold text-smart-gray dark:text-gray-500 uppercase mt-0.5">
+                            {new Date(alert.createdAt).toLocaleDateString()}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap align-top">
+                          <span className={`text-[8px] md:text-[9px] font-black px-2 py-1 rounded-md uppercase tracking-wider border inline-block w-[60px] md:w-[72px] text-center ${
+                            alert.type === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800' :
+                            alert.type === 'info' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800' :
+                            alert.type === 'action' ? 'bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow border-smart-light/20' :
+                            alert.type === 'success' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border-green-200 dark:border-green-800' :
+                            'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 border-red-200 dark:border-red-800'
+                          }`}>
+                            {alert.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-smart-dark dark:text-gray-200 font-medium text-xs md:text-sm leading-relaxed break-words align-top">
+                          {alert.message}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredAlerts.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan="3"
+                          className="p-8 text-center text-smart-gray dark:text-gray-500 font-black uppercase tracking-widest text-[10px]"
+                        >
+                          No results.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
+          {totalPages > 1 && !loading && (
+            <div className="bg-smart-bg/30 dark:bg-gray-900/30 px-4 md:px-6 py-4 border-t border-smart-light/10 flex flex-col sm:flex-row justify-between items-center gap-4 mt-auto">
+              <span className="text-[9px] md:text-[10px] font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest text-center sm:text-left">
+                {totalAlertsCount} Total Logs
+              </span>
+              <div className="flex space-x-2 items-center">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 md:px-4 md:py-2 bg-white dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest border border-smart-light/20 disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                <span className="text-[10px] font-black uppercase text-smart-dark dark:text-white">
+                  {page} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="px-3 py-1.5 md:px-4 md:py-2 bg-white dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest border border-smart-light/20 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

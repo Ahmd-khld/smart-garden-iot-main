@@ -50,10 +50,10 @@ const RescheduleModal = ({ ticketId, onClose, onSuccess }) => {
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
       <div 
-        className="bg-gray-900 border border-smart-light/20 w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl animate-fade-in-up"
+        className="bg-gray-900 border border-smart-light/20 w-full max-w-md rounded-[2.5rem] shadow-2xl animate-fade-in-up flex flex-col max-h-[80vh] md:max-h-[600px] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-8 border-b border-white/5 bg-gradient-to-r from-[#8cc63f]/10 to-transparent flex justify-between items-start">
+        <div className="p-8 border-b border-white/5 bg-gradient-to-r from-[#8cc63f]/10 to-transparent flex justify-between items-start shrink-0">
           <div>
             <h2 className="text-2xl font-black text-white italic uppercase tracking-wider">Reschedule Ticket</h2>
             <p className="text-gray-400 text-xs font-bold mt-1 uppercase tracking-widest opacity-60">Pick your new visit date</p>
@@ -68,13 +68,13 @@ const RescheduleModal = ({ ticketId, onClose, onSuccess }) => {
           </button>
         </div>
 
-        <div className="p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 pr-2 md:pr-6 custom-scrollbar">
           <div className="space-y-3">
             {dates.map((date) => (
               <button
                 key={date.fullDate}
                 onClick={() => setSelectedDate(date.fullDate)}
-                className={`w-full p-5 rounded-3xl border-2 transition-all flex items-center justify-between px-8 ${
+                className={`w-full py-3 px-8 rounded-3xl border-2 transition-all flex items-center justify-between ${
                   selectedDate === date.fullDate
                     ? 'border-[#8cc63f] bg-[#8cc63f]/10 text-white shadow-[0_0_20px_rgba(140,198,63,0.15)]'
                     : 'border-white/5 bg-white/5 text-gray-400 hover:border-white/10 hover:bg-white/10'
@@ -100,7 +100,7 @@ const RescheduleModal = ({ ticketId, onClose, onSuccess }) => {
           </div>
         </div>
 
-        <div className="p-8 bg-black/40 flex gap-4">
+        <div className="p-8 bg-black/40 flex gap-4 shrink-0">
           <button
             onClick={onClose}
             className="flex-1 py-4 rounded-2xl font-bold text-gray-500 hover:text-white transition-colors"
@@ -126,6 +126,7 @@ const RescheduleModal = ({ ticketId, onClose, onSuccess }) => {
         </div>
       </div>
     </div>
+
   );
 };
 

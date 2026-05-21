@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { socket } from '../socket';
 import { useUI } from '../context/UIContext';
 import api from '../api';
@@ -137,7 +137,23 @@ const AdminDashboard = () => {
   const [isSubAdminsExpanded, setIsSubAdminsExpanded] = useState(true);
 
   const [syncTrigger, setSyncTrigger] = useState(0);
-  const [isScanPaused, setIsScanPaused] = useState(false);
+  const [isLockedUI, setIsLockedUI] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const scanLock = useRef(false);
+
+  // Effect to track actual camera status in the DOM (detects when video is active)
+  useEffect(() => {
+    const readerElement = document.getElementById('reader');
+    if (!readerElement) return;
+
+    const observer = new MutationObserver(() => {
+      const isVideoActive = !!readerElement.querySelector('video');
+      setIsCameraActive(isVideoActive);
+    });
+
+    observer.observe(readerElement, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [activeTab]);
   const [backupSyncTrigger, setBackupSyncTrigger] = useState(0);
   const [dataRefreshTrigger, setDataRefreshTrigger] = useState(0);
 
@@ -360,16 +376,10 @@ const AdminDashboard = () => {
   useEffect(() => {
     let timer;
     if (activeTab === 'hardware') {
-      // Add a slight delay to ensure React has painted the <div id="reader"> into the DOM
       timer = setTimeout(() => {
         const readerElement = document.getElementById('reader');
         if (readerElement && !scannerRef.current) {
-          scannerRef.current = new Html5QrcodeScanner(
-            'reader',
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            false
-          );
-          scannerRef.current.render(onScanSuccess, onScanFailure);
+          scannerRef.current = new Html5Qrcode('reader');
         }
       }, 100);
     }
@@ -377,15 +387,50 @@ const AdminDashboard = () => {
     return () => {
       clearTimeout(timer);
       if (scannerRef.current) {
-        try {
-          scannerRef.current.clear().catch(() => {});
-        } catch (e) {
-          console.warn('Scanner clear failed', e);
+        if (scannerRef.current.isScanning) {
+          scannerRef.current.stop().catch(() => {});
         }
         scannerRef.current = null;
       }
     };
   }, [activeTab]);
+
+  const handleToggleSensor = async () => {
+    if (!scannerRef.current) return;
+
+    if (isCameraActive) {
+      try {
+        await scannerRef.current.stop();
+        setIsCameraActive(false);
+      } catch (err) {
+        console.error('Failed to stop scanner', err);
+      }
+    } else {
+      try {
+        await scannerRef.current.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess,
+          onScanFailure
+        );
+        setIsCameraActive(true);
+      } catch (err) {
+        console.error('Failed to start scanner', err);
+        setScanMessage({ type: 'error', text: 'Camera access denied or not found.' });
+      }
+    }
+  };
+
+  const handleFileScan = async (e) => {
+    if (!scannerRef.current || !e.target.files[0]) return;
+    const imageFile = e.target.files[0];
+    try {
+      const decodedText = await scannerRef.current.scanFile(imageFile, true);
+      onScanSuccess(decodedText);
+    } catch (err) {
+      setScanMessage({ type: 'error', text: 'No QR code found in image.' });
+    }
+  };
 
   const handleScanRequest = async (idToScan) => {
     const token = localStorage.getItem('token');
@@ -488,13 +533,13 @@ const AdminDashboard = () => {
   };
 
   const onScanSuccess = (decodedText) => {
-    if (isScanPaused) return; // Safety lock guard
-    setIsScanPaused(true); // Lock immediately
+    if (scanLock.current || !decodedText) return; // Hard lock guard clause using Ref
+    scanLock.current = true; // Lock immediately
+    setIsLockedUI(true); // Trigger UI overlay
 
     playSuccessSound();
-
+    
     let finalId = decodedText;
-
     // Check if it's a JWT from our system
     try {
       const parts = decodedText.split('.');
@@ -513,7 +558,7 @@ const AdminDashboard = () => {
   };
 
   const onScanFailure = (error) => {
-    // Ignore routine scan errors (e.g. no QR in frame)
+    // Ignore routine scan errors
   };
 
   const handleManualOverride = (e) => {
@@ -526,7 +571,8 @@ const AdminDashboard = () => {
   };
 
   const handleNextScan = () => {
-    setIsScanPaused(false);
+    scanLock.current = false;
+    setIsLockedUI(false);
     setScanMessage(null);
   };
 
@@ -2883,7 +2929,7 @@ const AdminDashboard = () => {
                       </div>
                     ) : insights ? (
                       <>
-                        <div className="grid grid-cols-7 gap-4 mb-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
                           {insights.days.map((day, index) => (
                             <div
                               key={index}
@@ -2893,11 +2939,11 @@ const AdminDashboard = () => {
                                   : 'bg-[#1e2329] border-2 border-transparent hover:bg-[#2a3038]'
                               }`}
                             >
-                              <div className="text-xs font-black text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-tighter">
+                              <div className="text-[10px] font-black text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-tighter">
                                 {day.dayName}
                               </div>
                               <div
-                                className={`text-3xl font-bold mb-1 ${
+                                className={`text-2xl md:text-3xl font-bold mb-1 ${
                                   day.crowdLevel === 'quiet'
                                     ? 'text-green-500'
                                     : day.crowdLevel === 'moderate'
@@ -2908,7 +2954,7 @@ const AdminDashboard = () => {
                                 {day.count}
                               </div>
                               <div
-                                className={`flex items-center gap-1.5 text-sm font-semibold ${
+                                className={`flex items-center gap-1.5 text-xs md:text-sm font-semibold ${
                                   day.crowdLevel === 'quiet'
                                     ? 'text-green-500'
                                     : day.crowdLevel === 'moderate'
@@ -2927,13 +2973,14 @@ const AdminDashboard = () => {
                                 ></div>
                                 {day.crowdLevel.charAt(0).toUpperCase() + day.crowdLevel.slice(1)}
                               </div>
-                              <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-2">
+                              <div className="text-[9px] text-gray-400 dark:text-gray-500 mt-2">
                                 {day.displayDate}
                               </div>
                             </div>
                           ))}
                         </div>
-                        <div className="flex items-center justify-center gap-8 text-xs">
+                        <div className="flex flex-wrap items-center justify-center gap-4 md:gap-8 text-[10px] md:text-xs">
+
                           <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-green-500"></div>
                             <span className="text-gray-500 dark:text-gray-400">Quiet (0-30%)</span>
@@ -4321,188 +4368,82 @@ const AdminDashboard = () => {
                     </div>
                   )}
 
-                  <style>{`
-                #reader { border: none !important; background: transparent !important; }
-                
-                /* Modern Card Style for the Permissions/Empty Screen */
-                #reader__dashboard_section_csr { 
-                  padding: 30px 20px !important; 
-                  text-align: center !important; 
-                  background: rgba(128, 194, 65, 0.05) !important;
-                  border-radius: 20px !important;
-                  margin: 24px 0 0 0 !important;
-                  border: 2px dashed rgba(128, 194, 65, 0.3) !important;
-                  display: flex !important;
-                  flex-direction: column !important;
-                  align-items: center !important;
-                  justify-content: center !important;
-                }
-                
-                /* Hide original text but keep element in document flow */
-                #reader__dashboard_section_csr > span { 
-                  color: transparent !important;
-                  font-size: 0 !important;
-                  position: relative !important;
-                  display: flex !important;
-                  flex-direction: column !important;
-                  align-items: center !important;
-                  justify-content: center !important;
-                  width: 100% !important;
-                  gap: 12px !important;
-                }
-                
-                /* Inject new themed text ONLY on the last span (prevents duplicate icons) */
-                #reader__dashboard_section_csr > span:last-child {
-                  padding-top: 0 !important;
-                }
-                
-                #reader__dashboard_section_csr > span:last-child::after {
-                  content: "OPTICAL SENSOR OFFLINE" !important;
-                  position: relative !important;
-                  top: 0 !important;
-                  left: 0 !important;
-                  width: 100% !important;
-                  color: #ef4444 !important; /* Red for offline */
-                  font-weight: 900 !important; 
-                  font-size: 12px !important; 
-                  font-family: inherit !important; 
-                  text-transform: uppercase !important;
-                  letter-spacing: 0.1em !important;
-                  text-align: center !important;
-                  order: -1 !important;
-                }
-                
-                /* Inject a custom camera SVG icon above the permissions text ONLY on the last span */
-                #reader__dashboard_section_csr > span:last-child::before {
-                  content: '';
-                  position: relative !important;
-                  top: 0 !important;
-                  width: 44px !important;
-                  height: 44px !important;
-                  background-color: #ef4444 !important; /* Match red offline theme */
-                  -webkit-mask: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M15 13a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E") no-repeat center / contain;
-                  mask: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M15 13a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E") no-repeat center / contain;
-                  order: -2 !important;
-                  margin-bottom: 8px !important;
-                  animation: offline-pulse 2.5s infinite ease-in-out !important;
-                }
-                
-                @keyframes offline-pulse {
-                  0%, 100% { opacity: 1; transform: scale(1); }
-                  50% { opacity: 0.5; transform: scale(0.92); }
-                }
-                
-                #reader button {
-                  padding: 10px 20px !important;
-                  cursor: pointer !important;
-                  margin: 0 auto !important;
-                  display: flex !important;
-                  align-items: center !important;
-                  justify-content: center !important;
-                  transition: all 0.2s ease-in-out !important;
-                  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
-                  /* Hide actual text without breaking button shadow/clickability */
-                  color: transparent !important;
-                  font-size: 0 !important;
-                  background: transparent !important;
-                  border: none !important;
-                  position: relative !important;
-                  min-width: 200px !important;
-                  min-height: 40px !important;
-                }
-                #reader button:hover { transform: translateY(-2px) !important; box-shadow: 0 6px 12px -2px rgba(128, 194, 65, 0.4) !important; }
-                
-                /* Inject custom button labels and backgrounds */
-                #html5-qrcode-button-camera-permission::after,
-                #html5-qrcode-button-camera-start::after,
-                #html5-qrcode-button-camera-stop::after {
-                  position: absolute !important;
-                  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-                  display: flex !important; align-items: center !important; justify-content: center !important;
-                  border-radius: 12px !important; font-weight: 900 !important; 
-                  text-transform: uppercase !important; letter-spacing: 0.1em !important; font-size: 10px !important;
-                  color: white !important;
-                  transition: background-color 0.2s ease-in-out !important;
-                }
-                
-                #html5-qrcode-button-camera-permission::after {
-                  content: "AUTHORIZE SENSOR LINK" !important;
-                  background-color: #80C241 !important; 
-                }
-                #html5-qrcode-button-camera-start::after {
-                  content: "ACTIVATE SENSOR" !important;
-                  background-color: #80C241 !important; 
-                }
-                #html5-qrcode-button-camera-stop::after {
-                  content: "HALT SENSOR" !important;
-                  background-color: #ef4444 !important; 
-                }
-                
-                /* Hover states for the ::after background colors */
-                #html5-qrcode-button-camera-permission:hover::after,
-                #html5-qrcode-button-camera-start:hover::after {
-                  background-color: #6da336 !important;
-                }
-                #html5-qrcode-button-camera-stop:hover::after {
-                  background-color: #dc2626 !important;
-                }
-                /* Hide default scanner target borders & camera dropdown */
-                #reader select { display: none !important; }
-                #reader a { color: #80C241 !important; text-decoration: none !important; font-weight: 900 !important; font-size: 11px !important; text-transform: uppercase !important; }
-                #reader a:hover { text-decoration: underline !important; opacity: 0.8 !important; }
-                
-                /* Fix video frame and target constraints */
-                #reader__scan_region { 
-                  background: transparent !important; 
-                  display: flex !important; 
-                  justify-content: center !important; 
-                  align-items: center !important;
-                  border-radius: 20px !important;
-                  overflow: hidden !important;
-                  border: 1px solid rgba(128, 194, 65, 0.2) !important;
-                  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
-                  position: relative !important;
-                }
-                #reader__dashboard_section_swaplink { margin-top: 10px !important; display: inline-block !important; }
-                #reader video { border-radius: 20px !important; object-fit: cover !important; }
-                
-                /* Hide default scanner target borders */
-                #qr-shaded-region div { display: none !important; }
-                
-                /* Add custom sci-fi target overlay in the transparent scan region */
-                #qr-shaded-region {
-                  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M40,4 L4,4 L4,40' fill='none' stroke='%2380C241' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M160,4 L196,4 L196,40' fill='none' stroke='%2380C241' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M40,196 L4,196 L4,160' fill='none' stroke='%2380C241' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M160,196 L196,196 L196,160' fill='none' stroke='%2380C241' stroke-width='8' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='100' cy='100' r='40' fill='none' stroke='%2380C241' stroke-width='3' stroke-dasharray='10 6' opacity='0.7'/%3E%3Ccircle cx='100' cy='100' r='5' fill='%2380C241'/%3E%3C/svg%3E") !important;
-                  background-repeat: no-repeat !important;
-                  background-position: center center !important;
-                  background-origin: content-box !important;
-                  background-clip: content-box !important;
-                  animation: reticle-pulse 2s infinite ease-in-out !important;
-                  position: absolute !important;
-                  top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
-                }
-                
-                @keyframes reticle-pulse {
-                  0% { background-size: 78% !important; }
-                  50% { background-size: 84% !important; }
-                  100% { background-size: 78% !important; }
-                }
-              `}</style>
-                <div className="relative w-full max-w-md mx-auto">
-                  <div
-                    id="reader"
-                    className="w-full bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-[30px] shadow-2xl border-4 border-smart-dark dark:border-smart-light/50 ring-8 ring-smart-bg dark:ring-gray-900"
-                  ></div>
-                  {isScanPaused && (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-[30px]">
-                      <button
-                        onClick={handleNextScan}
-                        className="bg-blue-500 hover:bg-blue-600 text-white font-black py-4 px-10 rounded-2xl shadow-2xl transform transition hover:scale-105 active:scale-95 uppercase tracking-widest text-sm"
+                  <div className="flex flex-col items-center justify-center p-6 bg-slate-800/50 rounded-xl border border-slate-700 w-full max-w-sm mx-auto gap-5 overflow-hidden shadow-2xl">
+                    {/* 1. Dynamic Status Indicator */}
+                    <div
+                      className={`flex items-center justify-center gap-2 text-sm font-bold tracking-wider whitespace-nowrap ${isCameraActive ? 'text-green-400' : 'text-red-400'}`}
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        Next Scan
-                      </button>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                        ></path>
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                        ></path>
+                      </svg>
+                      {isCameraActive ? 'OPTICAL SENSOR ONLINE' : 'OPTICAL SENSOR OFFLINE'}
                     </div>
-                  )}
-                </div>
+
+                    {/* 2. Main Action Button */}
+                    <button
+                      onClick={handleToggleSensor}
+                      className={`w-full font-bold py-3 px-4 rounded-lg transition-all transform active:scale-95 flex items-center justify-center text-white shadow-lg ${isCameraActive ? 'bg-red-500 hover:bg-red-600 shadow-red-900/20' : 'bg-green-500 hover:bg-green-600 shadow-green-900/20'}`}
+                    >
+                      {isCameraActive ? 'HALT SENSOR LINK' : 'AUTHORIZE SENSOR LINK'}
+                    </button>
+
+                    {/* 3. Fallback Link */}
+                    <label className="text-sm text-slate-400 hover:text-white transition-colors cursor-pointer flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>Scan an Image File</span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleFileScan}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="relative w-full max-w-md mx-auto mt-10">
+                    <style>{`
+                      #reader { border: none !important; }
+                      #reader video { 
+                        border-radius: 24px !important; 
+                        object-fit: cover !important;
+                        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+                      }
+                      #reader img { display: none !important; }
+                      #reader__scan_region { border: none !important; }
+                    `}</style>
+                    <div
+                      id="reader"
+                      className="w-full bg-white dark:bg-gray-800 rounded-[30px] shadow-2xl border-4 border-smart-dark dark:border-smart-light/50 ring-8 ring-smart-bg dark:ring-gray-900 overflow-hidden"
+                    ></div>
+                    {isLockedUI && (
+                      <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-[30px]">
+                        <button
+                          onClick={handleNextScan}
+                          className="bg-blue-500 hover:bg-blue-600 text-white font-black py-4 px-10 rounded-2xl shadow-2xl transform transition hover:scale-105 active:scale-95 uppercase tracking-widest text-sm"
+                        >
+                          Next Scan
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="bg-smart-bg dark:bg-gray-900 p-6 sm:p-8 border-t border-smart-light/10 mt-auto w-full">

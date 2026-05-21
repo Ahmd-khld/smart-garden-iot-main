@@ -192,70 +192,42 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-smart-bg dark:bg-black py-12 px-6 font-sans text-smart-gray dark:text-gray-300 transition-colors duration-300">
-      <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-10">
+    <div className="min-h-screen bg-smart-bg dark:bg-black py-6 md:py-12 px-4 md:px-6 font-sans text-smart-gray dark:text-gray-300 transition-colors duration-300">
+      <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-6 md:gap-10">
         {/* Sidebar */}
         <div className="w-full md:w-1/4">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-8 border border-smart-light/30 dark:border-smart-light/10 sticky top-28">
-            <div className="flex items-center space-x-4 mb-8 pb-8 border-b border-gray-100 dark:border-gray-700">
-              <div className="w-16 h-16 bg-smart-light/10 rounded-full flex items-center justify-center text-smart-light font-black text-2xl uppercase shadow-inner border border-smart-light/20">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-6 md:p-8 border border-smart-light/30 dark:border-smart-light/10 md:sticky md:top-28">
+            <div className="flex items-center space-x-4 mb-6 md:mb-8 pb-6 md:pb-8 border-b border-gray-100 dark:border-gray-700">
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-smart-light/10 rounded-full flex items-center justify-center text-smart-light font-black text-xl md:text-2xl uppercase shadow-inner border border-smart-light/20 shrink-0">
                 {user?.name?.charAt(0) || 'U'}
               </div>
-              <div>
-                <h2 className="text-xl font-black capitalize text-smart-dark dark:text-white italic">
+              <div className="overflow-hidden">
+                <h2 className="text-lg md:text-xl font-black capitalize text-smart-dark dark:text-white italic truncate">
                   {user?.name}
                 </h2>
-                <p className="text-sm text-smart-gray dark:text-gray-400 font-medium">
+                <p className="text-xs md:text-sm text-smart-gray dark:text-gray-400 font-medium">
                   {user?.role}
                 </p>
               </div>
             </div>
 
-            <nav className="space-y-3">
-              <button
-                onClick={() => setActiveTab('info')}
-                className={`w-full flex items-center space-x-3 px-5 py-4 rounded-2xl font-bold transition-all ${activeTab === 'info' ? 'bg-smart-dark dark:bg-smart-light text-white dark:text-smart-dark shadow-md' : 'text-smart-gray dark:text-gray-400 hover:bg-smart-bg dark:hover:bg-gray-700'}`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  ></path>
-                </svg>
-                <span>Edit Info</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('history')}
-                className={`w-full flex items-center space-x-3 px-5 py-4 rounded-2xl font-bold transition-all ${activeTab === 'history' ? 'bg-smart-dark dark:bg-smart-light text-white dark:text-smart-dark shadow-md' : 'text-smart-gray dark:text-gray-400 hover:bg-smart-bg dark:hover:bg-gray-700'}`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-                  ></path>
-                </svg>
-                <span>Purchase History</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('cards')}
-                className={`w-full flex items-center space-x-3 px-5 py-4 rounded-2xl font-bold transition-all ${activeTab === 'cards' ? 'bg-smart-dark dark:bg-smart-light text-white dark:text-smart-dark shadow-md' : 'text-smart-gray dark:text-gray-400 hover:bg-smart-bg dark:hover:bg-gray-700'}`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                  ></path>
-                </svg>
-                <span>Saved Cards</span>
-              </button>
+            <nav className="flex flex-row md:flex-col gap-2 md:space-y-3 overflow-x-auto scrollbar-hide md:overflow-visible">
+              {[
+                { id: 'info', label: 'Info', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+                { id: 'history', label: 'History', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+                { id: 'cards', label: 'Cards', icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 md:w-full flex items-center justify-center md:justify-start space-x-2 md:space-x-3 px-4 md:px-5 py-3 md:py-4 rounded-xl md:rounded-2xl font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-smart-dark dark:bg-smart-light text-white dark:text-smart-dark shadow-md scale-105 md:scale-100' : 'text-smart-gray dark:text-gray-400 hover:bg-smart-bg dark:hover:bg-gray-700'}`}
+                >
+                  <svg className="w-4 h-4 md:w-5 md:h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={tab.icon} />
+                  </svg>
+                  <span className="text-xs md:text-base">{tab.label}</span>
+                </button>
+              ))}
             </nav>
           </div>
         </div>
@@ -264,73 +236,73 @@ const Profile = () => {
         <div className="w-full md:w-3/4">
           {/* INFO TAB */}
           {activeTab === 'info' && (
-            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-10 border border-smart-light/30 dark:border-smart-light/10 animate-fade-in-up">
-              <h2 className="text-3xl font-black text-smart-dark dark:text-white mb-8 flex items-center italic">
+            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl p-6 md:p-10 border border-smart-light/30 dark:border-smart-light/10 animate-fade-in-up">
+              <h2 className="text-2xl md:text-3xl font-black text-smart-dark dark:text-white mb-6 md:mb-8 flex items-center italic">
                 Personal Information
               </h2>
 
               {message && (
                 <div
-                  className={`p-5 mb-8 rounded-2xl font-bold text-sm shadow-sm ${message.includes('Updated') ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}
+                  className={`p-4 md:p-5 mb-6 md:mb-8 rounded-2xl font-bold text-xs md:text-sm shadow-sm ${message.includes('Updated') ? 'bg-green-50 border border-green-200 text-green-800' : 'bg-red-50 border border-red-200 text-red-800'}`}
                 >
                   {message}
                 </div>
               )}
 
-              <form onSubmit={handleUpdateInfo} className="space-y-6 max-w-2xl">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <form onSubmit={handleUpdateInfo} className="space-y-4 md:space-y-6 max-w-2xl">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   <div>
-                    <label className="block text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wide">
+                    <label className="block text-[10px] md:text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wide">
                       Full Name
                     </label>
                     <input
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition bg-smart-bg dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 font-medium text-smart-dark dark:text-white"
+                      className="w-full px-4 md:px-5 py-3 md:py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition bg-smart-bg dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 font-medium text-sm md:text-base text-smart-dark dark:text-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wide">
+                    <label className="block text-[10px] md:text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wide">
                       Email Address
                     </label>
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition bg-smart-bg dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 font-medium text-smart-dark dark:text-white"
+                      className="w-full px-4 md:px-5 py-3 md:py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition bg-smart-bg dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 font-medium text-sm md:text-base text-smart-dark dark:text-white"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wide">
+                  <label className="block text-[10px] md:text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wide">
                     Phone Number
                   </label>
                   <input
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition bg-smart-bg dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 font-medium max-w-md text-smart-dark dark:text-white"
+                    className="w-full px-4 md:px-5 py-3 md:py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition bg-smart-bg dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 font-medium max-w-md text-sm md:text-base text-smart-dark dark:text-white"
                   />
                 </div>
 
-                <div className="flex items-center p-5 bg-smart-bg dark:bg-gray-700 rounded-2xl border border-smart-light/10 max-w-md">
+                <div className="flex items-center p-4 md:p-5 bg-smart-bg dark:bg-gray-700 rounded-2xl border border-smart-light/10 max-w-md">
                   <input
                     type="checkbox"
                     id="disability"
                     checked={hasDisability}
                     onChange={(e) => setHasDisability(e.target.checked)}
-                    className="w-6 h-6 text-smart-light border-gray-300 dark:border-gray-500 rounded focus:ring-smart-light cursor-pointer"
+                    className="w-5 h-5 md:w-6 md:h-6 text-smart-light border-gray-300 dark:border-gray-500 rounded focus:ring-smart-light cursor-pointer"
                   />
-                  <div className="ml-4">
+                  <div className="ml-3 md:ml-4">
                     <label
                       htmlFor="disability"
-                      className="block text-sm font-black text-smart-dark dark:text-white cursor-pointer italic"
+                      className="block text-xs md:text-sm font-black text-smart-dark dark:text-white cursor-pointer italic"
                     >
                       Require accessibility features
                     </label>
-                    <p className="text-xs text-smart-gray dark:text-gray-400 font-medium mt-1">
+                    <p className="text-[10px] md:text-xs text-smart-gray dark:text-gray-400 font-medium mt-1">
                       Wheelchair access, prioritized seating, etc.
                     </p>
                   </div>
@@ -338,7 +310,7 @@ const Profile = () => {
 
                 <button
                   type="submit"
-                  className="mt-8 px-10 py-4 bg-smart-light hover:bg-smart-dark text-white rounded-full font-black text-lg transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1"
+                  className="w-full md:w-auto mt-6 md:mt-8 px-10 py-4 bg-smart-light hover:bg-smart-dark text-white rounded-full font-black text-base md:text-lg transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 uppercase tracking-widest"
                 >
                   Save Changes
                 </button>
@@ -625,32 +597,32 @@ const Profile = () => {
         >
           <div 
             ref={ticketRef}
-            className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden border border-smart-light/20 transform transition-all animate-scale-up"
+            className="bg-white dark:bg-gray-800 w-full max-w-[350px] rounded-[40px] shadow-2xl overflow-hidden border border-smart-light/20 transform transition-all animate-scale-up"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-smart-dark p-8 border-b border-white/10 text-center relative">
+            <div className="bg-smart-dark p-6 border-b border-white/10 text-center relative">
               <button 
                 onClick={() => setSelectedQrTicket(null)}
-                className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors"
+                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-              <h2 className="text-2xl font-black text-smart-glow italic uppercase tracking-tighter text-white">
+              <h2 className="text-xl font-black text-smart-glow italic uppercase tracking-tighter text-white">
                 Entry Pass
               </h2>
               <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mt-1">
-                Scan at Gate Gate Scanner
+                Scan at Gate Scanner
               </p>
             </div>
 
-            <div className="p-10 flex flex-col items-center">
-              <div className="p-4 bg-white border-[6px] border-smart-dark rounded-[30px] shadow-xl mb-8 transform hover:scale-105 transition-transform duration-500">
-                <QRCodeSVG value={selectedQrTicket._id} size={200} level="H" />
+            <div className="p-6 flex flex-col items-center space-y-4">
+              <div className="w-48 h-48 mx-auto bg-white p-2 rounded-xl border-[4px] border-smart-dark shadow-xl flex items-center justify-center transform hover:scale-105 transition-transform duration-500">
+                <QRCodeSVG value={selectedQrTicket._id} size={160} level="H" />
               </div>
 
-              <div className="bg-smart-bg dark:bg-gray-700 px-6 py-4 rounded-2xl border border-smart-light/10 w-full text-center mb-6 shadow-inner">
+              <div className="bg-smart-bg dark:bg-gray-700 px-6 py-2 rounded-2xl border border-smart-light/10 w-full text-center shadow-inner">
                 <p className="text-[10px] text-smart-gray dark:text-gray-400 font-bold uppercase tracking-widest mb-1">
                   Unique Ticket ID
                 </p>
@@ -660,7 +632,7 @@ const Profile = () => {
               </div>
 
               {selectedQrTicket.validFrom && (
-                <div className="text-center w-full mb-8">
+                <div className="text-center w-full">
                   {selectedQrTicket.subscriptionPlan === 'monthly' ? (
                     <div className="space-y-1">
                       <p className="text-xs font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest">Validity Period</p>
@@ -679,19 +651,21 @@ const Profile = () => {
                 </div>
               )}
 
-              <button
-                onClick={handleDownloadTicket}
-                className="w-full py-4 bg-smart-light hover:bg-smart-dark text-white font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg shadow-smart-light/20 transition-all active:scale-95 mb-3"
-              >
-                Download Ticket
-              </button>
+              <div className="flex flex-col gap-2 w-full pt-2">
+                <button
+                  onClick={handleDownloadTicket}
+                  className="w-full py-3 bg-smart-light hover:bg-smart-dark text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-lg shadow-smart-light/20 transition-all active:scale-95"
+                >
+                  Download Ticket
+                </button>
 
-              <button
-                onClick={() => setSelectedQrTicket(null)}
-                className="w-full py-4 bg-smart-dark dark:bg-smart-light text-white dark:text-smart-dark font-black uppercase tracking-widest text-xs rounded-2xl shadow-lg hover:shadow-smart-light/20 transition-all active:scale-95"
-              >
-                Close Ticket
-              </button>
+                <button
+                  onClick={() => setSelectedQrTicket(null)}
+                  className="w-full py-3 bg-smart-dark dark:bg-smart-light text-white dark:text-smart-dark font-black uppercase tracking-widest text-xs rounded-xl shadow-lg hover:shadow-smart-light/20 transition-all active:scale-95"
+                >
+                  Close Ticket
+                </button>
+              </div>
             </div>
           </div>
         </div>

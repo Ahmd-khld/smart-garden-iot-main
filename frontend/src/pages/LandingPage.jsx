@@ -105,10 +105,10 @@ const LandingPage = () => {
         {/* Features Section */}
         <div className="flex-1 space-y-8" id="features">
           <div>
-            <h2 className="text-4xl font-extrabold text-smart-dark dark:text-smart-glow mb-4 italic tracking-tight">
+            <h2 className="text-2xl md:text-4xl font-extrabold text-smart-dark dark:text-smart-glow mb-4 italic tracking-tight">
               Welcome to the Future of Parks
             </h2>
-            <p className="text-lg text-smart-gray dark:text-gray-400 leading-relaxed font-medium">
+            <p className="text-base md:text-lg text-smart-gray dark:text-gray-400 leading-relaxed font-medium">
               Experience a sustainable, tech-driven environment designed for everyone. Our park
               utilizes cutting-edge IoT technology to enhance your visit.
             </p>

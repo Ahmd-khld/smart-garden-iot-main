@@ -217,23 +217,24 @@ const BookingPage = () => {
 
   return (
     <div className="min-h-screen bg-smart-bg dark:bg-black flex flex-col transition-colors duration-300">
-      <main className="flex-grow max-w-5xl mx-auto px-6 py-12 flex items-center justify-center w-full">
+      <main className="flex-grow max-w-5xl mx-auto px-4 sm:px-6 py-6 md:py-12 flex items-center justify-center w-full">
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col md:flex-row w-full border border-smart-light/30 dark:border-smart-light/10">
           {/* Info Side */}
-          <div className="bg-smart-dark p-10 text-white flex-1 flex flex-col justify-between">
+          <div className="bg-smart-dark p-6 md:p-10 text-white flex-1 flex flex-col justify-between">
             <div>
-              <h2 className="text-4xl font-extrabold mb-6 text-smart-glow">Select Your Passes</h2>
-              <p className="text-white/80 text-lg mb-8 leading-relaxed">
+              <h2 className="text-2xl md:text-4xl font-extrabold mb-4 md:mb-6 text-smart-glow">Select Your Passes</h2>
+              <p className="text-white/80 text-base md:text-lg mb-6 md:mb-8 leading-relaxed">
                 Choose the tickets that best fit your group. Our monthly subscriptions offer
                 unlimited access to all IoT park features.
               </p>
 
-              <div className="my-10 w-full flex justify-center">
+              <div className="my-6 md:my-10 w-full flex justify-center">
                 <WeatherWidget />
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4 md:space-y-6">
+
               <div className="flex items-center space-x-4">
                 <div className="bg-white/10 p-2 rounded-lg">
                   <svg
@@ -292,21 +293,21 @@ const BookingPage = () => {
           </div>
 
           {/* Form Side */}
-          <div className="p-10 flex-1 bg-white dark:bg-gray-800 flex flex-col justify-center">
+          <div className="p-6 md:p-10 flex-1 bg-white dark:bg-gray-800 flex flex-col justify-center">
             {error && (
-              <div className="mb-8 p-4 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-200 rounded-r-lg font-medium shadow-sm">
+              <div className="mb-6 md:mb-8 p-4 bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 text-red-700 dark:text-red-200 rounded-r-lg font-medium shadow-sm">
                 {error}
               </div>
             )}
-            <form onSubmit={handleProceed} className="space-y-8">
+            <form onSubmit={handleProceed} className="space-y-6 md:space-y-8">
               {/* Subscription Type Toggle */}
               <div>
-                <label className="block text-sm font-extrabold text-smart-dark dark:text-white mb-4 uppercase tracking-wider">
+                <label className="block text-[10px] md:text-sm font-extrabold text-smart-dark dark:text-white mb-3 md:mb-4 uppercase tracking-wider">
                   Duration
                 </label>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
                   <label
-                    className={`cursor-pointer border-2 rounded-xl p-5 text-center transition-all ${subscriptionType === 'one-time' ? 'border-smart-light bg-smart-light/5 dark:bg-smart-light/10 text-smart-dark dark:text-white font-extrabold shadow-sm transform scale-105' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-smart-light/40 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
+                    className={`cursor-pointer border-2 rounded-xl p-3 md:p-5 text-center transition-all ${subscriptionType === 'one-time' ? 'border-smart-light bg-smart-light/5 dark:bg-smart-light/10 text-smart-dark dark:text-white font-extrabold shadow-sm transform scale-105' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-smart-light/40 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
                   >
                     <input
                       type="radio"
@@ -316,12 +317,12 @@ const BookingPage = () => {
                       checked={subscriptionType === 'one-time'}
                       onChange={() => setSubscriptionType('one-time')}
                     />
-                    <div className="text-xl mb-1">One-Time</div>
-                    <div className="text-sm opacity-80 font-normal">Valid for 24 hours</div>
+                    <div className="text-base md:text-xl mb-1">One-Time</div>
+                    <div className="text-[10px] md:text-sm opacity-80 font-normal">Valid for 24 hours</div>
                   </label>
 
                   <label
-                    className={`relative cursor-pointer border-2 rounded-xl p-5 text-center transition-all ${subscriptionType === 'monthly' ? 'border-smart-light bg-smart-light/5 dark:bg-smart-light/10 text-smart-dark dark:text-white font-extrabold shadow-sm transform scale-105' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-smart-light/40 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
+                    className={`relative cursor-pointer border-2 rounded-xl p-3 md:p-5 text-center transition-all ${subscriptionType === 'monthly' ? 'border-smart-light bg-smart-light/5 dark:bg-smart-light/10 text-smart-dark dark:text-white font-extrabold shadow-sm transform scale-105' : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-smart-light/40 hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
                   >
                     <input
                       type="radio"
@@ -331,11 +332,11 @@ const BookingPage = () => {
                       checked={subscriptionType === 'monthly'}
                       onChange={() => setSubscriptionType('monthly')}
                     />
-                    <span className="absolute -top-3 -right-3 bg-red-500 text-white text-xs font-black uppercase px-3 py-1 rounded-full shadow-lg transform rotate-3">
+                    <span className="absolute -top-2 md:-top-3 -right-2 md:-right-3 bg-red-500 text-white text-[8px] md:text-xs font-black uppercase px-2 md:px-3 py-0.5 md:py-1 rounded-full shadow-lg transform rotate-3">
                       Best Value!
                     </span>
-                    <div className="text-xl mb-1">Monthly</div>
-                    <div className="text-sm opacity-80 font-normal">Unlimited access</div>
+                    <div className="text-base md:text-xl mb-1">Monthly</div>
+                    <div className="text-[10px] md:text-sm opacity-80 font-normal">Unlimited access</div>
                   </label>
                 </div>
               </div>

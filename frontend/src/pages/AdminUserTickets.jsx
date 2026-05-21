@@ -136,62 +136,58 @@ const AdminUserTickets = () => {
     <div className="min-h-screen bg-smart-bg dark:bg-gray-900 transition-colors duration-300">
       <AdminHeader title="Ticket Management" />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10">
         {/* User Info Header */}
-        <div className="mb-10 flex items-center justify-between">
-          <div>
+        <div className="mb-6 md:mb-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="overflow-hidden">
             <button
               onClick={() =>
                 navigate(`/admin/dashboard?tab=${location.state?.fromTab || 'overview'}`)
               }
-              className="mb-4 flex items-center text-sm font-black text-smart-light uppercase tracking-widest hover:text-smart-dark transition-colors"
+              className="mb-4 flex items-center text-[10px] md:text-sm font-black text-smart-light uppercase tracking-widest hover:text-smart-dark transition-colors"
             >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3 md:w-4 md:h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7" />
               </svg>
               Back to Dashboard
             </button>
-            <h1 className="text-4xl font-black text-smart-dark dark:text-white tracking-tighter italic uppercase">
+            <h1 className="text-2xl md:text-4xl font-black text-smart-dark dark:text-white tracking-tighter italic uppercase truncate">
               {user?.name || location.state?.userName || 'User'}'s Tickets
             </h1>
-            <p className="text-smart-gray dark:text-gray-400 font-bold mt-1">
-              User ID: <span className="font-mono text-xs">{userId}</span>
+            <p className="text-smart-gray dark:text-gray-400 font-bold mt-1 text-xs md:text-base">
+              User ID: <span className="font-mono text-[10px] md:text-xs">{userId}</span>
               {user?.diag_db && (
-                <span className="ml-4 text-[10px] text-pink-500 uppercase tracking-tighter bg-pink-500/10 px-2 py-0.5 rounded">
+                <span className="md:ml-4 mt-2 md:mt-0 block md:inline-block text-[8px] md:text-[10px] text-pink-500 uppercase tracking-tighter bg-pink-500/10 px-2 py-0.5 rounded w-fit">
                   Connected to: {user.diag_db}
-                </span>
-              )}
-              {tickets.length === 0 && user?.diag_totalTickets !== undefined && (
-                <span className="ml-4 text-[10px] text-orange-500 uppercase tracking-tighter bg-orange-500/10 px-2 py-0.5 rounded">
-                  DB has {user.diag_totalTickets} total tickets (non-matching)
                 </span>
               )}
             </p>
             {user?.isBlocked && (
-              <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-2xl flex items-center">
-                <svg className="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mt-4 p-3 md:p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-2xl flex items-center">
+                <svg className="w-4 h-4 md:w-5 md:h-5 text-red-500 mr-2 md:mr-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
-                <div>
-                  <p className="text-[10px] font-black uppercase text-red-600 dark:text-red-400 tracking-widest">Account Restricted</p>
-                  <p className="text-sm font-bold text-smart-dark dark:text-white italic">Reason: {user?.blockReason || 'No reason specified'}</p>
+                <div className="overflow-hidden">
+                  <p className="text-[8px] md:text-[10px] font-black uppercase text-red-600 dark:text-red-400 tracking-widest">Account Restricted</p>
+                  <p className="text-xs md:text-sm font-bold text-smart-dark dark:text-white italic truncate">Reason: {user?.blockReason || 'No reason specified'}</p>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl shadow-xl border border-smart-light/10 flex items-center gap-4">
-             <div className="text-right">
-                <p className="text-[10px] font-black uppercase text-smart-gray dark:text-gray-500 tracking-widest">Total Tickets</p>
-                <p className="text-2xl font-black text-smart-dark dark:text-white italic">{tickets.length}</p>
+          <div className="bg-white dark:bg-gray-800 p-4 md:p-4 rounded-3xl shadow-xl border border-smart-light/10 flex items-center justify-around md:justify-end gap-4 md:gap-4 w-full md:w-auto">
+             <div className="text-center md:text-right">
+                <p className="text-[8px] md:text-[10px] font-black uppercase text-smart-gray dark:text-gray-500 tracking-widest">Total</p>
+                <p className="text-xl md:text-2xl font-black text-smart-dark dark:text-white italic">{tickets.length}</p>
              </div>
              <div className="w-px h-8 bg-smart-light/10" />
-             <div className="text-right pr-2">
-                <p className="text-[10px] font-black uppercase text-smart-gray dark:text-gray-500 tracking-widest">Active</p>
-                <p className="text-2xl font-black text-green-500 italic">{tickets.filter(t => t.status === 'ACTIVE').length}</p>
+             <div className="text-center md:text-right md:pr-2">
+                <p className="text-[8px] md:text-[10px] font-black uppercase text-smart-gray dark:text-gray-500 tracking-widest">Active</p>
+                <p className="text-xl md:text-2xl font-black text-green-500 italic">{tickets.filter(t => t.status === 'ACTIVE').length}</p>
              </div>
           </div>
         </div>
+
 
         {/* Status Filter Bar */}
         <div className="mb-8 flex flex-wrap items-center gap-3">

@@ -222,13 +222,13 @@ const Payment = () => {
 
   return (
     <div className="min-h-screen bg-smart-bg dark:bg-black flex flex-col transition-colors duration-300">
-      <main className="flex-grow max-w-6xl mx-auto px-6 py-12 w-full flex items-center justify-center">
+      <main className="flex-grow max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-12 w-full flex items-center justify-center">
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col lg:flex-row w-full border border-smart-light/30 dark:border-smart-light/10">
           {/* Order Summary (Left) */}
-          <div className="bg-smart-dark p-10 text-white flex-1 flex flex-col">
-            <h2 className="text-3xl font-extrabold mb-8 flex items-center text-smart-glow italic">
+          <div className="bg-smart-dark p-6 md:p-10 text-white flex-1 flex flex-col">
+            <h2 className="text-2xl md:text-3xl font-extrabold mb-6 md:mb-8 flex items-center text-smart-glow italic">
               <svg
-                className="w-8 h-8 mr-3 text-smart-glow"
+                className="w-6 h-6 md:w-8 md:h-8 mr-3 text-smart-glow"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -244,55 +244,55 @@ const Payment = () => {
             </h2>
 
             <div className="flex-grow">
-              <div className="space-y-4 mb-8">
+              <div className="space-y-3 md:space-y-4 mb-6 md:mb-8">
                 {tickets.child > 0 && (
-                  <div className="flex justify-between items-center bg-black/20 p-4 rounded-xl border border-white/10">
-                    <span className="font-medium text-lg">{tickets.child}x Child Ticket</span>
-                    <span className="text-smart-glow font-bold">{tickets.child * 100} EGP</span>
+                  <div className="flex justify-between items-center bg-black/20 p-3 md:p-4 rounded-xl border border-white/10">
+                    <span className="font-medium text-base md:text-lg">{tickets.child}x Child Ticket</span>
+                    <span className="text-smart-glow font-bold text-sm md:text-base">{tickets.child * 100} EGP</span>
                   </div>
                 )}
                 {tickets.adult > 0 && (
-                  <div className="flex justify-between items-center bg-black/20 p-4 rounded-xl border border-white/10">
-                    <span className="font-medium text-lg">{tickets.adult}x Adult Ticket</span>
-                    <span className="text-smart-glow font-bold">{tickets.adult * 200} EGP</span>
+                  <div className="flex justify-between items-center bg-black/20 p-3 md:p-4 rounded-xl border border-white/10">
+                    <span className="font-medium text-base md:text-lg">{tickets.adult}x Adult Ticket</span>
+                    <span className="text-smart-glow font-bold text-sm md:text-base">{tickets.adult * 200} EGP</span>
                   </div>
                 )}
                 {tickets.senior > 0 && (
-                  <div className="flex justify-between items-center bg-black/20 p-4 rounded-xl border border-white/10">
-                    <span className="font-medium text-lg">{tickets.senior}x Senior Ticket</span>
-                    <span className="text-smart-glow font-bold">{tickets.senior * 150} EGP</span>
+                  <div className="flex justify-between items-center bg-black/20 p-3 md:p-4 rounded-xl border border-white/10">
+                    <span className="font-medium text-base md:text-lg">{tickets.senior}x Senior Ticket</span>
+                    <span className="text-smart-glow font-bold text-sm md:text-base">{tickets.senior * 150} EGP</span>
                   </div>
                 )}
               </div>
 
-              <div className="bg-smart-light/20 border border-smart-light/30 p-4 rounded-xl mb-8">
-                <p className="text-sm text-smart-glow uppercase tracking-widest font-bold mb-1">
+              <div className="bg-smart-light/20 border border-smart-light/30 p-3 md:p-4 rounded-xl mb-6 md:mb-8">
+                <p className="text-[10px] md:text-sm text-smart-glow uppercase tracking-widest font-bold mb-1">
                   Subscription Plan
                 </p>
-                <p className="text-xl font-bold capitalize text-white">{subscriptionType}</p>
+                <p className="text-lg md:text-xl font-bold capitalize text-white">{subscriptionType}</p>
               </div>
             </div>
 
             <div className="border-t border-white/10 pt-6 mt-auto">
               {/* Promo Code Input */}
               <div className="mb-6">
-                <label className="block text-xs font-black text-white/50 uppercase tracking-widest mb-2">
+                <label className="block text-[10px] font-black text-white/50 uppercase tracking-widest mb-2">
                   Have a Reward Code?
                 </label>
                 <div className="flex space-x-2">
                   <input
                     type="text"
-                    placeholder="Enter Promo Code"
+                    placeholder="Enter Code"
                     value={promoCodeInput}
                     onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
                     disabled={isPromoValid}
-                    className="flex-grow bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-smart-glow transition-all"
+                    className="flex-grow bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-smart-glow transition-all min-w-0"
                   />
                   <button
                     type="button"
                     onClick={handleValidatePromo}
                     disabled={promoLoading || isPromoValid || !promoCodeInput}
-                    className={`px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${isPromoValid ? 'bg-green-500 text-white' : 'bg-smart-glow text-smart-dark hover:scale-105'}`}
+                    className={`px-4 py-3 rounded-xl font-black text-[10px] md:text-xs uppercase tracking-widest transition-all shrink-0 ${isPromoValid ? 'bg-green-500 text-white' : 'bg-smart-glow text-smart-dark hover:scale-105'}`}
                   >
                     {promoLoading ? '...' : isPromoValid ? '✓' : 'Apply'}
                   </button>
@@ -310,18 +310,18 @@ const Payment = () => {
               </div>
 
               <div className="flex justify-between items-end">
-                <span className="text-white/60 uppercase tracking-widest font-bold">
+                <span className="text-white/60 uppercase tracking-widest font-bold text-xs md:text-sm">
                   Total to Pay
                 </span>
                 <div className="text-right">
                   {isPromoValid && (
-                    <p className="text-white/40 line-through text-sm font-bold mb-[-4px]">
+                    <p className="text-white/40 line-through text-xs md:text-sm font-bold mb-[-4px]">
                       {totalPrice} EGP
                     </p>
                   )}
-                  <p className="text-4xl font-black text-smart-glow">
+                  <p className="text-3xl md:text-4xl font-black text-smart-glow">
                     {isPromoValid ? Math.round(discountedPrice) : totalPrice}
-                    <span className="text-lg text-white/50 ml-1">EGP</span>
+                    <span className="text-base md:text-lg text-white/50 ml-1">EGP</span>
                   </p>
                 </div>
               </div>
@@ -329,48 +329,48 @@ const Payment = () => {
           </div>
 
           {/* Payment Interface (Right) */}
-          <div className="p-10 flex-1 bg-white dark:bg-gray-800 flex flex-col">
-            <div className="mb-8">
-              <h2 className="text-3xl font-extrabold text-smart-dark dark:text-white mb-6 italic">
+          <div className="p-6 md:p-10 flex-1 bg-white dark:bg-gray-800 flex flex-col">
+            <div className="mb-6 md:mb-8">
+              <h2 className="text-2xl md:text-3xl font-extrabold text-smart-dark dark:text-white mb-4 md:mb-6 italic">
                 Secure Payment
               </h2>
 
               {/* Payment Tabs */}
-              <div className="flex space-x-2 bg-smart-bg dark:bg-gray-700 p-1 rounded-xl border border-smart-light/10">
+              <div className="flex bg-smart-bg dark:bg-gray-700 p-1 rounded-xl border border-smart-light/10 overflow-x-auto scrollbar-hide">
                 {['credit_card', 'valu', 'klivvr', 'CASH'].map((method) => (
                   <button
                     key={method}
                     type="button"
                     onClick={() => setPaymentMethod(method)}
-                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-bold transition-all ${
+                    className={`flex-1 min-w-[100px] py-2.5 md:py-3 px-3 md:px-4 rounded-lg text-[10px] md:text-sm font-bold transition-all whitespace-nowrap ${
                       paymentMethod === method
                         ? 'bg-white dark:bg-gray-800 text-smart-dark dark:text-white shadow-sm border border-smart-light/20'
                         : 'text-smart-gray dark:text-gray-400 hover:text-smart-dark dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-600'
                     }`}
                   >
                     {method === 'credit_card' && 'Credit Card'}
-                    {method === 'valu' && 'Valu (Installments)'}
+                    {method === 'valu' && 'Valu'}
                     {method === 'klivvr' && 'Klivvr'}
-                    {method === 'CASH' && 'Cash at Gate'}
+                    {method === 'CASH' && 'Cash'}
                   </button>
                 ))}
               </div>
             </div>
 
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg font-medium shadow-sm">
+              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg font-medium shadow-sm text-sm">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handlePayment} className="space-y-6 flex-grow flex flex-col">
+            <form onSubmit={handlePayment} className="space-y-4 md:space-y-6 flex-grow flex flex-col">
               {savedCards.length > 0 && (
-                <div className="mb-4">
-                  <label className="block text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wider">
-                    Use a Saved Payment Method
+                <div className="mb-2 md:mb-4">
+                  <label className="block text-[10px] md:text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wider">
+                    Use a Saved Method
                   </label>
                   <select
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-smart-light outline-none font-bold text-smart-dark dark:text-white bg-smart-bg dark:bg-gray-700"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-smart-light outline-none font-bold text-sm md:text-base text-smart-dark dark:text-white bg-smart-bg dark:bg-gray-700"
                     value={selectedSavedCard}
                     onChange={(e) => {
                       setSelectedSavedCard(e.target.value);
@@ -388,11 +388,11 @@ const Payment = () => {
               )}
 
               {useSavedCard ? (
-                <div className="flex-grow flex items-center justify-center p-8 bg-smart-bg dark:bg-gray-700 rounded-xl border-2 border-dashed border-smart-light/20">
+                <div className="flex-grow flex items-center justify-center p-6 md:p-8 bg-smart-bg dark:bg-gray-700 rounded-xl border-2 border-dashed border-smart-light/20">
                   <div className="text-center">
-                    <div className="w-16 h-16 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-smart-light/10">
+                    <div className="w-12 h-12 md:w-16 md:h-16 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4 shadow-sm border border-smart-light/10">
                       <svg
-                        className="w-8 h-8 text-smart-light"
+                        className="w-6 h-6 md:w-8 md:h-8 text-smart-light"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -405,19 +405,19 @@ const Payment = () => {
                         ></path>
                       </svg>
                     </div>
-                    <h3 className="font-extrabold text-smart-dark dark:text-white text-lg mb-2">
+                    <h3 className="font-extrabold text-smart-dark dark:text-white text-base md:text-lg mb-1 md:mb-2">
                       Using Saved Card
                     </h3>
-                    <p className="text-smart-gray dark:text-gray-300 text-sm">
-                      You are checking out with your securely saved card ending in{' '}
+                    <p className="text-smart-gray dark:text-gray-300 text-xs md:text-sm">
+                      Checking out with card ending in{' '}
                       {savedCards.find((c) => c._id === selectedSavedCard)?.last4Digits}.
                     </p>
                   </div>
                 </div>
               ) : paymentMethod === 'credit_card' ? (
-                <div className="space-y-6 flex-grow">
+                <div className="space-y-4 md:space-y-6 flex-grow">
                   <div>
-                    <label className="block text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wider">
+                    <label className="block text-[10px] md:text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wider">
                       Card Number
                     </label>
                     <div className="relative">
@@ -425,12 +425,12 @@ const Payment = () => {
                         type="text"
                         value={cardNumber}
                         onChange={handleCardNumberChange}
-                        className="w-full px-4 py-4 pl-12 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-smart-light focus:border-transparent outline-none transition font-mono text-lg text-smart-dark dark:text-white bg-smart-bg dark:bg-gray-700"
+                        className="w-full px-4 py-3 md:py-4 pl-10 md:pl-12 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-smart-light focus:border-transparent outline-none transition font-mono text-base md:text-lg text-smart-dark dark:text-white bg-smart-bg dark:bg-gray-700"
                         placeholder="0000 0000 0000 0000"
                         required
                       />
                       <svg
-                        className="w-6 h-6 text-smart-light absolute left-4 top-1/2 transform -translate-y-1/2"
+                        className="w-5 h-5 md:w-6 md:h-6 text-smart-light absolute left-3 md:left-4 top-1/2 transform -translate-y-1/2"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -445,29 +445,29 @@ const Payment = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-2 gap-4 md:gap-6">
                     <div>
-                      <label className="block text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wider">
+                      <label className="block text-[10px] md:text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wider">
                         Expiry Date
                       </label>
                       <input
                         type="text"
                         value={expiry}
                         onChange={handleExpiryChange}
-                        className="w-full px-4 py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-smart-light focus:border-transparent outline-none transition font-mono text-lg text-center text-smart-dark dark:text-white bg-smart-bg dark:bg-gray-700"
+                        className="w-full px-4 py-3 md:py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-smart-light focus:border-transparent outline-none transition font-mono text-base md:text-lg text-center text-smart-dark dark:text-white bg-smart-bg dark:bg-gray-700"
                         placeholder="MM/YY"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wider">
+                      <label className="block text-[10px] md:text-sm font-extrabold text-smart-dark dark:text-white mb-2 uppercase tracking-wider">
                         CVV
                       </label>
                       <input
                         type="password"
                         value={cvv}
                         onChange={handleCvvChange}
-                        className="w-full px-4 py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-smart-light focus:border-transparent outline-none transition font-mono text-lg text-center tracking-widest text-smart-dark dark:text-white bg-smart-bg dark:bg-gray-700"
+                        className="w-full px-4 py-3 md:py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-smart-light focus:border-transparent outline-none transition font-mono text-base md:text-lg text-center tracking-widest text-smart-dark dark:text-white bg-smart-bg dark:bg-gray-700"
                         placeholder="•••"
                         required
                       />
@@ -475,11 +475,11 @@ const Payment = () => {
                   </div>
                 </div>
               ) : paymentMethod === 'CASH' ? (
-                <div className="flex-grow flex items-center justify-center p-8 bg-smart-bg dark:bg-gray-700 rounded-xl border-2 border-dashed border-smart-light/20">
+                <div className="flex-grow flex items-center justify-center p-6 md:p-8 bg-smart-bg dark:bg-gray-700 rounded-xl border-2 border-dashed border-smart-light/20">
                   <div className="text-center">
-                    <div className="w-16 h-16 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-smart-light/10">
+                    <div className="w-12 h-12 md:w-16 md:h-16 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4 shadow-sm border border-smart-light/10">
                       <svg
-                        className="w-8 h-8 text-smart-light"
+                        className="w-6 h-6 md:w-8 md:h-8 text-smart-light"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -492,24 +492,24 @@ const Payment = () => {
                         ></path>
                       </svg>
                     </div>
-                    <h3 className="font-extrabold text-smart-dark dark:text-white text-lg mb-2">
+                    <h3 className="font-extrabold text-smart-dark dark:text-white text-base md:text-lg mb-1 md:mb-2">
                       Pay Cash at Gate
                     </h3>
-                    <p className="text-smart-gray dark:text-gray-300 text-sm">
-                      Reserve your tickets now and pay exactly{' '}
+                    <p className="text-smart-gray dark:text-gray-300 text-xs md:text-sm">
+                      Reserve now and pay{' '}
                       <strong className="text-smart-dark dark:text-smart-glow">
                         {isPromoValid ? Math.round(discountedPrice) : totalPrice} EGP
                       </strong>{' '}
-                      physically at the park gate to activate them.
+                      at the gate to activate.
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="flex-grow flex items-center justify-center p-8 bg-smart-bg dark:bg-gray-700 rounded-xl border-2 border-dashed border-smart-light/20">
+                <div className="flex-grow flex items-center justify-center p-6 md:p-8 bg-smart-bg dark:bg-gray-700 rounded-xl border-2 border-dashed border-smart-light/20">
                   <div className="text-center">
-                    <div className="w-16 h-16 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-smart-light/10">
+                    <div className="w-12 h-12 md:w-16 md:h-16 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4 shadow-sm border border-smart-light/10">
                       <svg
-                        className="w-8 h-8 text-smart-light"
+                        className="w-6 h-6 md:w-8 md:h-8 text-smart-light"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -522,11 +522,11 @@ const Payment = () => {
                         ></path>
                       </svg>
                     </div>
-                    <h3 className="font-extrabold text-smart-dark dark:text-white text-lg mb-2">
-                      You will be redirected
+                    <h3 className="font-extrabold text-smart-dark dark:text-white text-base md:text-lg mb-1 md:mb-2">
+                      External Redirect
                     </h3>
-                    <p className="text-smart-gray dark:text-gray-300 text-sm">
-                      You will securely finalize your payment directly on the{' '}
+                    <p className="text-smart-gray dark:text-gray-300 text-xs md:text-sm">
+                      Finalize payment on the{' '}
                       {paymentMethod === 'valu' ? 'Valu' : 'Klivvr'} app after clicking Pay.
                     </p>
                   </div>
@@ -535,19 +535,19 @@ const Payment = () => {
 
               <div className="mt-auto pt-6 border-t border-smart-light/10">
                 {!useSavedCard && paymentMethod === 'credit_card' && (
-                  <div className="flex items-center mb-6">
+                  <div className="flex items-center mb-4 md:mb-6">
                     <input
                       type="checkbox"
                       id="saveCard"
                       checked={saveCard}
                       onChange={(e) => setSaveCard(e.target.checked)}
-                      className="w-5 h-5 text-smart-light border-gray-300 dark:border-gray-500 rounded focus:ring-smart-light cursor-pointer"
+                      className="w-4 h-4 md:w-5 md:h-5 text-smart-light border-gray-300 dark:border-gray-500 rounded focus:ring-smart-light cursor-pointer"
                     />
                     <label
                       htmlFor="saveCard"
-                      className="ml-3 block text-sm font-medium text-smart-gray dark:text-gray-400 cursor-pointer select-none"
+                      className="ml-2 md:ml-3 block text-xs md:text-sm font-medium text-smart-gray dark:text-gray-400 cursor-pointer select-none"
                     >
-                      Save this card securely for future fast checkouts
+                      Save card for future fast checkouts
                     </label>
                   </div>
                 )}
@@ -555,12 +555,12 @@ const Payment = () => {
                 <button
                   type="submit"
                   disabled={isProcessing}
-                  className={`w-full font-extrabold py-4 text-lg rounded-xl transition-all shadow-xl flex items-center justify-center space-x-2 ${isProcessing ? 'bg-smart-gray cursor-not-allowed text-white' : 'bg-smart-light hover:bg-smart-dark text-white hover:shadow-2xl hover:-translate-y-1'}`}
+                  className={`w-full font-extrabold py-3.5 md:py-4 text-base md:text-lg rounded-xl transition-all shadow-xl flex items-center justify-center space-x-2 ${isProcessing ? 'bg-smart-gray cursor-not-allowed text-white' : 'bg-smart-light hover:bg-smart-dark text-white hover:shadow-2xl hover:-translate-y-1'}`}
                 >
                   {isProcessing ? (
                     <>
                       <svg
-                        className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                        className="animate-spin -ml-1 mr-3 h-4 w-4 md:h-5 md:w-5 text-white"
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
                         viewBox="0 0 24 24"
@@ -579,12 +579,12 @@ const Payment = () => {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         ></path>
                       </svg>
-                      <span>Processing...</span>
+                      <span className="text-sm md:text-lg">Processing...</span>
                     </>
                   ) : (
                     <>
                       <svg
-                        className="w-6 h-6"
+                        className="w-5 h-5 md:w-6 md:h-6"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -596,7 +596,7 @@ const Payment = () => {
                           d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                         ></path>
                       </svg>
-                      <span>{paymentMethod === 'CASH' ? 'Reserve Ticket' : 'Pay & Generate Tickets'}</span>
+                      <span className="text-sm md:text-lg">{paymentMethod === 'CASH' ? 'Reserve Ticket' : 'Pay & Generate'}</span>
                     </>
                   )}
                 </button>
@@ -606,6 +606,7 @@ const Payment = () => {
         </div>
       </main>
     </div>
+
   );
 };
 
