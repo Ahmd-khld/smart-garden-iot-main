@@ -83,7 +83,15 @@ const HardwareStatsWidget = ({ socket }) => {
                   onClick={() => handleRowClick(item.system)}
                   className="border-b border-[#2B2F3A] hover:bg-[#2B2F3A] transition-colors cursor-pointer"
                 >
-                  <td className="px-4 py-3 text-gray-200 font-medium">{item.system}</td>
+                  <td className="px-4 py-3 text-gray-200 font-medium">
+                    <div className="flex items-center gap-3">
+                      <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                      </span>
+                      <span>{item.system}</span>
+                    </div>
+                  </td>
                   <td
                     className={`px-4 py-3 ${item.error > 0 ? 'text-[#D32D5F] font-bold' : 'text-gray-600'}`}
                   >
