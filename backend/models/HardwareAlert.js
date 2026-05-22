@@ -6,6 +6,10 @@ const hardwareAlertSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    sensor: {
+      type: String,
+      required: true,
+    },
     type: {
       type: String,
       enum: ['info', 'warning', 'action', 'success', 'error'],

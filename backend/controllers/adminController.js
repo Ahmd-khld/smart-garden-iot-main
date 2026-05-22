@@ -1612,6 +1612,69 @@ const getPendingCashTickets = async (req, res) => {
   }
 };
 
+const getHardwareStats = async (req, res) => {
+  try {
+    const sensors = [
+      'Gate Ultrasonic',
+      'Gate Servo',
+      'LDR',
+      'LED Lamp',
+      'Soil Moisture',
+      'Water Pump',
+      'DHT11',
+      'RGB Ultrasonic',
+      'RGB LED',
+    ];
+
+    const statsAgg = await HardwareAlert.aggregate([
+      {
+        $group: {
+          _id: { sensor: '$sensor', type: '$type' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const stats = {};
+    sensors.forEach((s) => {
+      stats[s] = {
+        error: 0,
+        warning: 0,
+        success: 0,
+        info: 0,
+        action: 0,
+      };
+    });
+
+    statsAgg.forEach((item) => {
+      const { sensor, type } = item._id;
+      if (stats[sensor]) {
+        stats[sensor][type] = item.count;
+      }
+    });
+
+    res.status(200).json(stats);
+  } catch (error) {
+    console.error('Hardware Stats Error:', error);
+    res.status(500).json({ message: 'Error retrieving hardware stats' });
+  }
+};
+
+const getAlertsBySensor = async (req, res) => {
+  try {
+    const { sensorName } = req.params;
+    const alerts = await HardwareAlert.find({ sensor: sensorName })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+
+    res.status(200).json(alerts);
+  } catch (error) {
+    console.error('Fetch Sensor Alerts Error:', error);
+    res.status(500).json({ message: 'Error fetching alerts for sensor' });
+  }
+};
+
 module.exports = {
   getAdminStats,
   scanTicket,
@@ -1622,6 +1685,8 @@ module.exports = {
   deleteUser,
   resetOccupancy,
   getHardwareAlerts,
+  getHardwareStats,
+  getAlertsBySensor,
   unlockScanner,
   getAuditLogs,
   getBannedIPs,

@@ -1,0 +1,238 @@
+import React, { useState, useEffect } from 'react';
+import api from '../api';
+
+const HardwareStatsWidget = ({ socket }) => {
+  const [stats, setStats] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [selectedSensor, setSelectedSensor] = useState(null);
+  const [sensorLogs, setSensorLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const sensors = [
+    'Gate Ultrasonic',
+    'Gate Servo',
+    'LDR',
+    'LED Lamp',
+    'Soil Moisture',
+    'Water Pump',
+    'DHT11',
+    'RGB Ultrasonic',
+    'RGB LED',
+  ];
+
+  useEffect(() => {
+    const fetchInitialStats = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await api.get('/admin/hardware-stats', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setStats(res.data);
+      } catch (err) {
+        console.error('Failed to fetch hardware stats:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInitialStats();
+
+    if (socket) {
+      const handleHardwareAlert = (alert) => {
+        setStats((prev) => {
+          const sensorStats = prev[alert.sensor] || {
+            error: 0,
+            warning: 0,
+            success: 0,
+            info: 0,
+            action: 0,
+          };
+          return {
+            ...prev,
+            [alert.sensor]: {
+              ...sensorStats,
+              [alert.type]: (sensorStats[alert.type] || 0) + 1,
+            },
+          };
+        });
+      };
+
+      socket.on('hardwareAlert', handleHardwareAlert);
+
+      return () => {
+        socket.off('hardwareAlert', handleHardwareAlert);
+      };
+    }
+  }, [socket]);
+
+  const handleRowClick = async (sensorName) => {
+    setSelectedSensor(sensorName);
+    setLoadingLogs(true);
+    setSensorLogs([]);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await api.get(`/admin/hardware-alerts/${encodeURIComponent(sensorName)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSensorLogs(res.data);
+    } catch (err) {
+      console.error('Failed to fetch sensor logs:', err);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-[#15171E] p-6 w-full rounded-sm border border-[#2B2F3A] animate-pulse h-64 flex items-center justify-center mb-8">
+        <span className="text-gray-500 font-medium text-sm italic">Initializing Security Matrix...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-[#15171E] p-6 w-full font-sans text-gray-300 rounded-sm border border-[#2B2F3A] mb-8 overflow-hidden">
+      <h2 className="text-lg font-medium text-gray-100 mb-4 flex items-center gap-2">
+        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+          />
+        </svg>
+        IoT Telemetry & Security Matrix
+      </h2>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead className="bg-[#1D212A] border-y border-[#2B2F3A] text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+            <tr>
+              <th className="px-4 py-3">Sensor</th>
+              <th className="px-4 py-3">Errors (Crit)</th>
+              <th className="px-4 py-3">Warnings (High)</th>
+              <th className="px-4 py-3">Success (Norm)</th>
+              <th className="px-4 py-3">Info (Low)</th>
+              <th className="px-4 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="text-[13px]">
+            {sensors.map((sensor) => {
+              const s = stats[sensor] || { error: 0, warning: 0, success: 0, info: 0, action: 0 };
+              return (
+                <tr
+                  key={sensor}
+                  onClick={() => handleRowClick(sensor)}
+                  className="border-b border-[#2B2F3A] hover:bg-[#2B2F3A] transition-colors cursor-pointer"
+                >
+                  <td className="px-4 py-3 text-gray-200 font-medium">{sensor}</td>
+                  <td
+                    className={`px-4 py-3 ${s.error > 0 ? 'text-[#D32D5F] font-bold' : 'text-gray-600'}`}
+                  >
+                    {s.error}
+                  </td>
+                  <td
+                    className={`px-4 py-3 ${s.warning > 0 ? 'text-[#F57C00] font-bold' : 'text-gray-600'}`}
+                  >
+                    {s.warning}
+                  </td>
+                  <td
+                    className={`px-4 py-3 ${s.success > 0 ? 'text-[#009688] font-bold' : 'text-gray-600'}`}
+                  >
+                    {s.success}
+                  </td>
+                  <td
+                    className={`px-4 py-3 ${s.info > 0 ? 'text-[#00B3E6] font-bold' : 'text-gray-600'}`}
+                  >
+                    {s.info}
+                  </td>
+                  <td
+                    className={`px-4 py-3 text-right ${s.action > 0 ? 'text-[#9C27B0] font-bold' : 'text-gray-600'}`}
+                  >
+                    {s.action}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {selectedSensor && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#15171E] border border-[#2B2F3A] rounded-sm w-full max-w-4xl max-h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-zoom-in">
+            <div className="bg-[#1D212A] border-b border-[#2B2F3A] p-4 flex justify-between items-center">
+              <h3 className="text-lg font-medium text-gray-100 flex items-center gap-3 italic">
+                <span className="w-2 h-2 bg-smart-glow rounded-full animate-pulse"></span>
+                Raw Logs: <span className="text-smart-glow uppercase tracking-widest font-black ml-1">{selectedSensor}</span>
+              </h3>
+              <button
+                onClick={() => setSelectedSensor(null)}
+                className="text-gray-400 hover:text-white hover:bg-[#2B2F3A] rounded-md p-1.5 transition-colors font-sans text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="flex-grow overflow-y-auto p-0 custom-scrollbar">
+              {loadingLogs ? (
+                <div className="flex flex-col items-center justify-center h-64 space-y-4">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-smart-glow"></div>
+                  <span className="text-gray-500 font-bold uppercase tracking-widest text-[10px]">Analyzing Data Packets...</span>
+                </div>
+              ) : sensorLogs.length > 0 ? (
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-[#1D212A] z-10 shadow-md border-y border-[#2B2F3A] text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    <tr>
+                      <th className="px-4 py-3">Timestamp</th>
+                      <th className="px-4 py-3">Severity</th>
+                      <th className="px-4 py-3">Message</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#2B2F3A] font-mono text-[11px]">
+                    {sensorLogs.map((log) => (
+                      <tr key={log._id} className="hover:bg-[#1D212A]/50 transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-400">
+                          {new Date(log.createdAt).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-sm border font-bold uppercase tracking-tighter ${
+                            log.type === 'error' ? 'bg-[#D32D5F]/10 text-[#D32D5F] border-[#D32D5F]/30' :
+                            log.type === 'warning' ? 'bg-[#F57C00]/10 text-[#F57C00] border-[#F57C00]/30' :
+                            log.type === 'success' ? 'bg-[#009688]/10 text-[#009688] border-[#009688]/30' :
+                            log.type === 'info' ? 'bg-[#00B3E6]/10 text-[#00B3E6] border-[#00B3E6]/30' :
+                            'bg-[#9C27B0]/10 text-[#9C27B0] border-[#9C27B0]/30'
+                          }`}>
+                            {log.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 w-full break-words text-gray-300">
+                          {log.message}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="flex items-center justify-center h-64 text-gray-500 font-bold uppercase tracking-widest text-[10px]">
+                  No raw logs available for this component.
+                </div>
+              )}
+            </div>
+
+            <div className="bg-[#1D212A] border-t border-[#2B2F3A] p-3 text-right">
+              <button
+                onClick={() => setSelectedSensor(null)}
+                className="px-6 py-2 bg-[#2B2F3A] hover:bg-[#3B3F4A] text-gray-100 font-black text-[10px] uppercase tracking-widest rounded-sm transition-all border border-[#3B3F4A]"
+              >
+                Close Matrix
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default HardwareStatsWidget;

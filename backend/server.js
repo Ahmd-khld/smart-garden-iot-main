@@ -277,17 +277,35 @@ setInterval(async () => {
     { message: 'Solar panel array #3 reporting peak output.', type: 'success' },
     { message: 'Pet hydration station #1 refilled automatically.', type: 'action' },
   ];
+  const sensors = [
+    'Gate Ultrasonic',
+    'Gate Servo',
+    'LDR',
+    'LED Lamp',
+    'Soil Moisture',
+    'Water Pump',
+    'DHT11',
+    'RGB Ultrasonic',
+    'RGB LED',
+  ];
   const randomAlert = alertTemplates[Math.floor(Math.random() * alertTemplates.length)];
+  const randomSensor = sensors[Math.floor(Math.random() * sensors.length)];
   const timeString = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   try {
     const newAlert = new HardwareAlert({
       message: randomAlert.message,
+      sensor: randomSensor,
       type: randomAlert.type,
       timeString,
     });
     await newAlert.save();
     // Only emit hardware alerts to the admin-room to ensure only authenticated admins see them
-    io.to('admin-room').emit('hardwareAlert', { id: newAlert._id, time: timeString, ...randomAlert });
+    io.to('admin-room').emit('hardwareAlert', {
+      id: newAlert._id,
+      time: timeString,
+      sensor: randomSensor,
+      ...randomAlert,
+    });
     const isEmailConfigured = process.env.EMAIL_USER && process.env.EMAIL_USER !== 'your-email@gmail.com' && process.env.EMAIL_PASS && process.env.EMAIL_PASS !== 'your-app-password';
     if (randomAlert.type === 'error' && isEmailConfigured) {
       const adminUser = await User.findOne({ role: 'admin' });

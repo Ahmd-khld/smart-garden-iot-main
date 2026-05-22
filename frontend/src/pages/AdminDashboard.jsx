@@ -4669,10 +4669,10 @@ const AdminDashboard = () => {
 
                       <div className="bg-smart-bg dark:bg-gray-900 p-6 border-t border-smart-light/10 flex justify-center items-center">
                         <button
-                          onClick={() => navigate('/admin/alerts')}
-                          className="text-smart-light font-black text-[11px] hover:text-smart-dark dark:hover:text-white transition-all uppercase tracking-widest border-b-2 border-transparent hover:border-smart-light pb-1"
+                          onClick={() => navigate('/admin/telemetry')}
+                          className="bg-green-600 hover:bg-green-700 text-white font-black text-[11px] py-3 px-8 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-green-900/20"
                         >
-                          Establish Full Diagnostic Link
+                          View Live Telemetry
                         </button>
                       </div>
                     </div>

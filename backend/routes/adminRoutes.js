@@ -18,6 +18,8 @@ const {
   getMonthlySales,
   clearAuditLogs,
   getHardwareAlerts,
+  getHardwareStats,
+  getAlertsBySensor,
   clearHardwareAlerts,
   createBackup,
   getBackups,
@@ -56,7 +58,9 @@ router.get('/whitelisted-ips', requireAdmin, validateRequest(adminSearchSchema),
 router.post('/whitelisted-ips', requireSuperAdmin, addWhitelistedIP);
 router.delete('/whitelisted-ips/:id', requireSuperAdmin, removeWhitelistedIP);
 router.get('/monthly-sales', requireAdmin, getMonthlySales);
+router.get('/hardware-stats', protect, requireAdmin, getHardwareStats);
 router.get('/hardware-alerts', requireAdmin, validateRequest(adminSearchSchema), getHardwareAlerts);
+router.get('/hardware-alerts/:sensorName', protect, requireAdmin, getAlertsBySensor);
 router.delete('/hardware-alerts', requireSuperAdmin, clearHardwareAlerts);
 router.post('/unlock-scanner', requireAdmin, unlockScanner);
 router.post('/backup', requireSuperAdmin, createBackup);
