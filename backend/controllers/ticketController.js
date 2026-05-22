@@ -521,7 +521,7 @@ const checkout = async (req, res) => {
             io.to(`user-${req.user._id}-tickets`).emit('ticketStatusChanged', {
               ticketId: ticket._id,
               userId: req.user._id,
-              status: 'ACTIVE',
+              status: ticket.status,
               updatedAt: ticket.createdAt,
               ticket: ticket,
             });
@@ -646,6 +646,15 @@ const cancelTicket = async (req, res) => {
 
     const io = req.app.get('io');
     if (io) {
+      // NEW: Emit targeted update to the specific user's room for real-time refresh
+      io.to(`user-${req.user._id}-tickets`).emit('ticketStatusChanged', {
+        ticketId: ticket._id,
+        userId: req.user._id,
+        status: 'CANCELLED',
+        updatedAt: ticket.updatedAt,
+        ticket: ticket,
+      });
+
       const salesAgg = await Ticket.aggregate([
         { $match: { status: { $ne: 'CANCELLED' } } },
         {

@@ -26,6 +26,34 @@ const Profile = () => {
 
   const navigate = useNavigate();
 
+  // Socket connection & Room management
+  useEffect(() => {
+    if (!user?._id) return;
+
+    socket.connect();
+    socket.emit('joinUserRoom', user._id);
+
+    const handleTicketUpdate = (payload) => {
+      setTickets((prevTickets) => {
+        const index = prevTickets.findIndex((t) => t._id === payload.ticketId);
+        if (index !== -1) {
+          const updated = [...prevTickets];
+          updated[index] = { ...updated[index], ...payload.ticket };
+          return updated;
+        } else {
+          return [payload.ticket, ...prevTickets];
+        }
+      });
+    };
+
+    socket.on('ticketStatusChanged', handleTicketUpdate);
+
+    return () => {
+      socket.emit('leaveUserRoom', user._id);
+      socket.off('ticketStatusChanged', handleTicketUpdate);
+    };
+  }, [user?._id]);
+
   useEffect(() => {
     const fetchAllData = async () => {
       const token = localStorage.getItem('token');
@@ -47,25 +75,6 @@ const Profile = () => {
         setPhone(data.phone);
         setHasDisability(data.hasDisability);
 
-        // Socket logic
-        socket.connect();
-        socket.emit('joinUserRoom', data._id);
-
-        socket.on('ticketStatusChanged', (payload) => {
-          setTickets((prevTickets) => {
-            const index = prevTickets.findIndex((t) => t._id === payload.ticketId);
-            if (index !== -1) {
-              // Update existing ticket
-              const updated = [...prevTickets];
-              updated[index] = { ...updated[index], ...payload.ticket };
-              return updated;
-            } else {
-              // Add new ticket (e.g. from checkout)
-              return [payload.ticket, ...prevTickets];
-            }
-          });
-        });
-
         // Fetch Tickets
         const ticketsRes = await api.get('/tickets/history', {
           headers: { Authorization: `Bearer ${token}` },
@@ -81,13 +90,6 @@ const Profile = () => {
     };
 
     fetchAllData();
-
-    return () => {
-      if (user?._id) {
-        socket.emit('leaveUserRoom', user._id);
-      }
-      socket.off('ticketStatusChanged');
-    };
   }, [navigate]);
 
   const handleUpdateInfo = async (e) => {

@@ -515,7 +515,7 @@ const scanUserTicket = async (req, res) => {
     });
     if (!ticket) return res.status(404).json({ message: 'Ticket not found for this user' });
 
-    if (ticket.status === 'used' || ticket.status === 'expired') {
+    if (ticket.status === 'USED' || ticket.status === 'EXPIRED') {
       return res.status(400).json({ message: `Ticket is already ${ticket.status}` });
     }
 
@@ -529,7 +529,13 @@ const scanUserTicket = async (req, res) => {
       });
     }
 
-    ticket.status = 'USED';
+    const subType = ticket.subscriptionPlan || 'one-time';
+    if (subType === 'monthly') {
+      // Monthly pass: don't mark as USED
+    } else {
+      ticket.status = 'USED';
+    }
+
     ticket.scanHistory = ticket.scanHistory || [];
     ticket.scanHistory.push(new Date());
     await ticket.save();
@@ -537,11 +543,14 @@ const scanUserTicket = async (req, res) => {
     // Emit targeted socket event to the user's specific room
     const io = req.app.get('io');
     if (io) {
-      io.to(`user-${userId}-tickets`).emit('ticketScanned', {
+      const payload = {
         ticketId: ticket._id,
-        status: 'USED',
+        status: ticket.status,
         updatedAt: ticket.updatedAt,
-      });
+        ticket,
+      };
+      io.to(`user-${userId}-tickets`).emit('ticketStatusChanged', payload);
+      io.to(`user-${userId}-tickets`).emit('ticketScanned', payload);
     }
 
     await logAdminAction(req, `Scanned ticket ${ticketId} for user ${userId}`);
@@ -1542,10 +1551,6 @@ const activateCashTicket = async (req, res) => {
     ticket.paymentStatus = 'PAID';
     ticket.status = 'ACTIVE';
     
-    // Increment Occupancy: Add a scan entry for today to signify arrival/check-in
-    if (!ticket.scanHistory) ticket.scanHistory = [];
-    ticket.scanHistory.push(new Date());
-
     // Explicitly save before response or emissions
     await ticket.save();
 
@@ -1566,9 +1571,6 @@ const activateCashTicket = async (req, res) => {
       
       // Global broadcast for public availability window
       io.emit('crowdDataUpdated');
-      
-      // Update global occupancy stats
-      await broadcastOccupancy(req);
     }
 
     await logAdminAction(req, `Manually activated cash ticket ${id}`);
