@@ -1457,18 +1457,30 @@ const generateMockData = async (req, res) => {
 
     // 4. GENERATE HARDWARE ALERTS
     const alertTemplates = [
-      { message: 'Simulation alert: Zone C moisture drop', type: 'warning' },
-      { message: 'Simulation alert: West Gate deployment', type: 'info' },
-      { message: 'Simulation alert: Smart Bin full', type: 'warning' },
-      { message: 'Simulation alert: Irrigation complete', type: 'success' },
-      { message: 'Simulation alert: Critical hardware error', type: 'error' },
+      { message: 'System initialized: Environmental Matrix online', type: 'success' },
+      { message: 'Authentication Link: Access Control ready', type: 'info' },
+      { message: 'Security Scan: Pathway Motion operational', type: 'info' },
+      { message: 'Light Management: Ambient sensors calibrated', type: 'success' },
+    ];
+    const sensorsList = [
+      'Gate Ultrasonic',
+      'Gate Servo',
+      'LDR',
+      'LED Lamp',
+      'Soil Moisture',
+      'Water Pump',
+      'DHT11',
+      'RGB Ultrasonic',
+      'RGB LED',
     ];
     const alertDocs = [];
     const totalAlerts = Math.floor(SCALE.alertCount * SCALE.multiplier);
     for (let l = 0; l < totalAlerts; l++) {
       const tpl = alertTemplates[l % alertTemplates.length];
+      const sensor = sensorsList[l % sensorsList.length];
       alertDocs.push({
-        message: tpl.message + ' #' + (l + 1),
+        sensor,
+        message: tpl.message,
         type: tpl.type,
         timeString: new Date().toLocaleTimeString(),
       });
@@ -1614,17 +1626,12 @@ const getPendingCashTickets = async (req, res) => {
 
 const getHardwareStats = async (req, res) => {
   try {
-    const sensors = [
-      'Gate Ultrasonic',
-      'Gate Servo',
-      'LDR',
-      'LED Lamp',
-      'Soil Moisture',
-      'Water Pump',
-      'DHT11',
-      'RGB Ultrasonic',
-      'RGB LED',
-    ];
+    const systemMapping = {
+      'Ambient Lighting': ['LDR', 'LED Lamp'],
+      'Automated Gate': ['Gate Ultrasonic', 'Gate Servo'],
+      'Smart Irrigation': ['Soil Moisture', 'DHT11', 'Water Pump'],
+      'Smart Recycle Bins': ['RGB Ultrasonic', 'RGB LED'],
+    };
 
     const statsAgg = await HardwareAlert.aggregate([
       {
@@ -1636,20 +1643,23 @@ const getHardwareStats = async (req, res) => {
     ]);
 
     const stats = {};
-    sensors.forEach((s) => {
-      stats[s] = {
-        error: 0,
-        warning: 0,
-        success: 0,
-        info: 0,
-        action: 0,
-      };
+    Object.keys(systemMapping).forEach((sys) => {
+      stats[sys] = { error: 0, warning: 0, success: 0, info: 0, action: 0 };
     });
+
+    // Helper to find system for a sensor
+    const getSystemForSensor = (sensorName) => {
+      for (const [sys, sensors] of Object.entries(systemMapping)) {
+        if (sensors.includes(sensorName)) return sys;
+      }
+      return null;
+    };
 
     statsAgg.forEach((item) => {
       const { sensor, type } = item._id;
-      if (stats[sensor]) {
-        stats[sensor][type] = item.count;
+      const system = getSystemForSensor(sensor);
+      if (system) {
+        stats[system][type] = (stats[system][type] || 0) + item.count;
       }
     });
 
@@ -1663,7 +1673,20 @@ const getHardwareStats = async (req, res) => {
 const getAlertsBySensor = async (req, res) => {
   try {
     const { sensorName } = req.params;
-    const alerts = await HardwareAlert.find({ sensor: sensorName })
+
+    const systemMapping = {
+      'Ambient Lighting': ['LDR', 'LED Lamp'],
+      'Automated Gate': ['Gate Ultrasonic', 'Gate Servo'],
+      'Smart Irrigation': ['Soil Moisture', 'DHT11', 'Water Pump'],
+      'Smart Recycle Bins': ['RGB Ultrasonic', 'RGB LED'],
+    };
+
+    let sensorQuery = sensorName;
+    if (systemMapping[sensorName]) {
+      sensorQuery = { $in: systemMapping[sensorName] };
+    }
+
+    const alerts = await HardwareAlert.find({ sensor: sensorQuery })
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();

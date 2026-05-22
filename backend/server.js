@@ -267,68 +267,6 @@ io.on('connection', (socket) => {
   });
 });
 
-setInterval(async () => {
-  const alertTemplates = [
-    { message: 'Zone C moisture dropped below 30%. Irrigation scheduled.', type: 'warning' },
-    { message: 'RFID Ramp deployed successfully at West Gate.', type: 'info' },
-    { message: 'Smart Bin #4 in Sector A is at 95% capacity.', type: 'warning' },
-    { message: 'Automated irrigation cycle completed in Sector 2.', type: 'success' },
-    { message: 'Unrecognized QR code scanned at Staff Entrance.', type: 'error' },
-    { message: 'Solar panel array #3 reporting peak output.', type: 'success' },
-    { message: 'Pet hydration station #1 refilled automatically.', type: 'action' },
-  ];
-  const sensors = [
-    'Gate Ultrasonic',
-    'Gate Servo',
-    'LDR',
-    'LED Lamp',
-    'Soil Moisture',
-    'Water Pump',
-    'DHT11',
-    'RGB Ultrasonic',
-    'RGB LED',
-  ];
-  const randomAlert = alertTemplates[Math.floor(Math.random() * alertTemplates.length)];
-  const randomSensor = sensors[Math.floor(Math.random() * sensors.length)];
-  const timeString = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  try {
-    const newAlert = new HardwareAlert({
-      message: randomAlert.message,
-      sensor: randomSensor,
-      type: randomAlert.type,
-      timeString,
-    });
-    await newAlert.save();
-    // Only emit hardware alerts to the admin-room to ensure only authenticated admins see them
-    io.to('admin-room').emit('hardwareAlert', {
-      id: newAlert._id,
-      time: timeString,
-      sensor: randomSensor,
-      ...randomAlert,
-    });
-    const isEmailConfigured = process.env.EMAIL_USER && process.env.EMAIL_USER !== 'your-email@gmail.com' && process.env.EMAIL_PASS && process.env.EMAIL_PASS !== 'your-app-password';
-    if (randomAlert.type === 'error' && isEmailConfigured) {
-      const adminUser = await User.findOne({ role: 'admin' });
-      const adminEmail = (adminUser && adminUser.email) || process.env.EMAIL_USER;
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-      });
-      await transporter.sendMail({
-        from: `"Smart Park System" <${process.env.EMAIL_USER}>`,
-        to: adminEmail,
-        subject: `🚨 CRITICAL HARDWARE ERROR DETECTED`,
-        html: `
-        <h2 style="color: #ef4444;">Smart Park Hardware Alert</h2>
-        <p><strong>Time:</strong> ${timeString}</p>
-        <p><strong>Details:</strong> ${randomAlert.message}</p>
-        <p>Please log in to the Admin Control Panel immediately to investigate.</p>
-      `,
-      });
-    }
-  } catch (err) {}
-}, Math.floor(Math.random() * ((parseInt(process.env.HARDWARE_ALERT_MAX_INTERVAL) || 12000) - (parseInt(process.env.HARDWARE_ALERT_MIN_INTERVAL) || 4000))) + (parseInt(process.env.HARDWARE_ALERT_MIN_INTERVAL) || 4000));
-
 app.use((err, req, res, next) => {
   let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
   if (err.message === 'Not authorized, no session' || err.message === 'Not authorized, token failed') {

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Html5QrcodeScanner, Html5Qrcode } from 'html5-qrcode';
 import { socket } from '../socket';
 import { useUI } from '../context/UIContext';
+import { useTelemetry } from '../context/TelemetryContext';
 import api from '../api';
 import AdminHeader from '../components/AdminHeader';
 import WidgetErrorBoundary from '../components/WidgetErrorBoundary';
@@ -89,12 +90,20 @@ const AdminDashboard = () => {
   const [whitelistPage, setWhitelistPage] = useState(1);
   const [whitelistHasMore, setWhitelistHasMore] = useState(false);
   const [isLoadingWhitelist, setIsLoadingWhitelist] = useState(false);
-  const [alerts, setAlerts] = useState([]);
+  const {
+    alerts,
+    setAlerts,
+    totalAlertsCount,
+    setTotalAlertsCount,
+    telemetryMatrix,
+  } = useTelemetry();
+
   const [alertPage, setAlertPage] = useState(1);
   const [totalAlertPages, setTotalAlertPages] = useState(1);
-  const [totalAlertsCount, setTotalAlertsCount] = useState(0);
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
+
   const [userPage, setUserPage] = useState(1);
+
   const [monthlySales, setMonthlySales] = useState([]);
   const [isMonthlySalesExpanded, setIsMonthlySalesExpanded] = useState(false);
   const [salesStartDate, setSalesStartDate] = useState('');
@@ -326,7 +335,13 @@ const AdminDashboard = () => {
           params: { page: 1, limit: 10 },
           headers: { Authorization: `Bearer ${token}` },
         });
-        setAlerts(alertsRes.data.alerts || (Array.isArray(alertsRes.data) ? alertsRes.data : []));
+        const backendAlerts = alertsRes.data.alerts || (Array.isArray(alertsRes.data) ? alertsRes.data : []);
+        setAlerts((prev) => {
+          // Merge logic: take backend alerts, and append current alerts that aren't in the backend list
+          const backendIds = new Set(backendAlerts.map(a => a._id));
+          const uniqueCurrent = prev.filter(a => !backendIds.has(a._id));
+          return [...backendAlerts, ...uniqueCurrent].slice(0, 100);
+        });
         setTotalAlertPages(alertsRes.data.totalPages || 1);
         setTotalAlertsCount(alertsRes.data.totalAlerts || 0);
       } catch (error) {
@@ -4563,7 +4578,7 @@ const AdminDashboard = () => {
                       </select>
                     </div>
 
-                    <div className="flex-grow overflow-y-auto overflow-x-auto">
+                    <div className="flex-grow overflow-y-auto overflow-x-auto h-[450px] custom-scrollbar">
                       <table className="w-full text-left border-collapse">
                         <thead className="sticky top-0 bg-smart-bg dark:bg-gray-900 z-10">
                           <tr className="border-b border-smart-light/10 text-smart-gray dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">
@@ -4628,7 +4643,7 @@ const AdminDashboard = () => {
                                 colSpan="3"
                                 className="p-8 text-center text-smart-gray dark:text-gray-500 font-black uppercase tracking-widest text-[10px]"
                               >
-                                No alerts match the selected filter.
+                                No hardware alerts detected. Waiting for telemetry...
                               </td>
                             </tr>
                           )}
@@ -4637,28 +4652,28 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="mt-auto flex flex-col w-full">
-                      {totalAlertPages > 1 && !isLoadingAlerts && (
+                      {(totalAlertPages > 1 || filteredAlerts.length === 0) && !isLoadingAlerts && (
                         <div className="bg-smart-bg/30 dark:bg-gray-900/30 px-6 sm:px-8 py-4 border-t border-smart-light/10 flex flex-col sm:flex-row justify-between items-center gap-4">
                           <span className="text-[10px] font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest text-center sm:text-left w-full sm:w-auto shrink-0">
-                            Showing {(alertPage - 1) * 10 + 1} to{' '}
+                            Showing {filteredAlerts.length === 0 ? 0 : (alertPage - 1) * 10 + 1} to{' '}
                             {Math.min(alertPage * 10, totalAlertsCount)} of {totalAlertsCount}
                           </span>
                           <div className="flex space-x-2 items-center justify-center sm:justify-end w-full sm:w-auto shrink-0">
                             <button
                               onClick={() => fetchAlertsPage(Math.max(1, alertPage - 1))}
-                              disabled={alertPage === 1}
+                              disabled={alertPage <= 1}
                               className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-smart-light/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-smart-light/10 shadow-sm"
                             >
                               Prev
                             </button>
                             <span className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-smart-dark dark:text-white flex items-center shrink-0">
-                              Page {alertPage} of {totalAlertPages}
+                              Page {filteredAlerts.length === 0 ? 0 : alertPage} of {filteredAlerts.length === 0 ? 0 : totalAlertPages}
                             </span>
                             <button
                               onClick={() =>
                                 fetchAlertsPage(Math.min(totalAlertPages, alertPage + 1))
                               }
-                              disabled={alertPage >= totalAlertPages}
+                              disabled={alertPage >= totalAlertPages || filteredAlerts.length === 0}
                               className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-smart-light/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-smart-light/10 shadow-sm"
                             >
                               Next

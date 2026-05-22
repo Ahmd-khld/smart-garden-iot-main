@@ -1,94 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import api from '../api';
+import { useTelemetry } from '../context/TelemetryContext';
 
 const HardwareStatsWidget = ({ socket }) => {
-  const [stats, setStats] = useState({});
-  const [loading, setLoading] = useState(true);
+  const { telemetryMatrix, setTelemetryMatrix, alerts: globalAlerts } = useTelemetry();
   const [selectedSensor, setSelectedSensor] = useState(null);
   const [sensorLogs, setSensorLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
-  const sensors = [
-    'Gate Ultrasonic',
-    'Gate Servo',
-    'LDR',
-    'LED Lamp',
-    'Soil Moisture',
-    'Water Pump',
-    'DHT11',
-    'RGB Ultrasonic',
-    'RGB LED',
-  ];
+  const systemMapping = {
+    'Ambient Lighting': ['LDR', 'LED Lamp'],
+    'Automated Gate': ['Gate Ultrasonic', 'Gate Servo'],
+    'Smart Irrigation': ['Soil Moisture', 'DHT11', 'Water Pump'],
+    'Smart Recycle Bins': ['RGB Ultrasonic', 'RGB LED'],
+  };
 
-  useEffect(() => {
-    const fetchInitialStats = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const res = await api.get('/admin/hardware-stats', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setStats(res.data);
-      } catch (err) {
-        console.error('Failed to fetch hardware stats:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInitialStats();
-
-    if (socket) {
-      const handleHardwareAlert = (alert) => {
-        setStats((prev) => {
-          const sensorStats = prev[alert.sensor] || {
-            error: 0,
-            warning: 0,
-            success: 0,
-            info: 0,
-            action: 0,
-          };
-          return {
-            ...prev,
-            [alert.sensor]: {
-              ...sensorStats,
-              [alert.type]: (sensorStats[alert.type] || 0) + 1,
-            },
-          };
-        });
-      };
-
-      socket.on('hardwareAlert', handleHardwareAlert);
-
-      return () => {
-        socket.off('hardwareAlert', handleHardwareAlert);
-      };
-    }
-  }, [socket]);
-
-  const handleRowClick = async (sensorName) => {
-    setSelectedSensor(sensorName);
+  const handleRowClick = async (systemName) => {
+    setSelectedSensor(systemName);
     setLoadingLogs(true);
     setSensorLogs([]);
     try {
+      // 1. Fetch real logs from DB
       const token = localStorage.getItem('token');
-      const res = await api.get(`/admin/hardware-alerts/${encodeURIComponent(sensorName)}`, {
+      const res = await api.get(`/admin/hardware-alerts/${encodeURIComponent(systemName)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setSensorLogs(res.data);
+      const dbLogs = res.data;
+
+      // 2. Filter global alerts for the selected system
+      // Some global alerts have a 'system' property (simulated ones), 
+      // others might have a 'sensor' property (real-time ones from socket).
+      const relevantSimulated = globalAlerts.filter(alert => {
+        if (alert.system === systemName) return true;
+        if (systemMapping[systemName]?.includes(alert.sensor)) return true;
+        return false;
+      });
+
+      // 3. Merge and Sort by Date (newest first)
+      const mergedLogs = [...relevantSimulated, ...dbLogs].sort((a, b) => 
+        new Date(b.createdAt) - new Date(a.createdAt)
+      );
+
+      setSensorLogs(mergedLogs);
     } catch (err) {
-      console.error('Failed to fetch sensor logs:', err);
+      console.error('Failed to fetch system logs:', err);
     } finally {
       setLoadingLogs(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="bg-[#15171E] p-6 w-full rounded-sm border border-[#2B2F3A] animate-pulse h-64 flex items-center justify-center mb-8">
-        <span className="text-gray-500 font-medium text-sm italic">Initializing Security Matrix...</span>
-      </div>
-    );
-  }
 
   return (
     <div className="bg-[#15171E] p-6 w-full font-sans text-gray-300 rounded-sm border border-[#2B2F3A] mb-8 overflow-hidden">
@@ -108,7 +67,7 @@ const HardwareStatsWidget = ({ socket }) => {
         <table className="w-full text-left border-collapse">
           <thead className="bg-[#1D212A] border-y border-[#2B2F3A] text-[11px] font-bold text-gray-400 uppercase tracking-wider">
             <tr>
-              <th className="px-4 py-3">Sensor</th>
+              <th className="px-4 py-3">System</th>
               <th className="px-4 py-3">Errors (Crit)</th>
               <th className="px-4 py-3">Warnings (High)</th>
               <th className="px-4 py-3">Success (Norm)</th>
@@ -117,39 +76,38 @@ const HardwareStatsWidget = ({ socket }) => {
             </tr>
           </thead>
           <tbody className="text-[13px]">
-            {sensors.map((sensor) => {
-              const s = stats[sensor] || { error: 0, warning: 0, success: 0, info: 0, action: 0 };
+            {telemetryMatrix.map((item) => {
               return (
                 <tr
-                  key={sensor}
-                  onClick={() => handleRowClick(sensor)}
+                  key={item.id}
+                  onClick={() => handleRowClick(item.system)}
                   className="border-b border-[#2B2F3A] hover:bg-[#2B2F3A] transition-colors cursor-pointer"
                 >
-                  <td className="px-4 py-3 text-gray-200 font-medium">{sensor}</td>
+                  <td className="px-4 py-3 text-gray-200 font-medium">{item.system}</td>
                   <td
-                    className={`px-4 py-3 ${s.error > 0 ? 'text-[#D32D5F] font-bold' : 'text-gray-600'}`}
+                    className={`px-4 py-3 ${item.error > 0 ? 'text-[#D32D5F] font-bold' : 'text-gray-600'}`}
                   >
-                    {s.error}
+                    {item.error}
                   </td>
                   <td
-                    className={`px-4 py-3 ${s.warning > 0 ? 'text-[#F57C00] font-bold' : 'text-gray-600'}`}
+                    className={`px-4 py-3 ${item.warning > 0 ? 'text-[#F57C00] font-bold' : 'text-gray-600'}`}
                   >
-                    {s.warning}
+                    {item.warning}
                   </td>
                   <td
-                    className={`px-4 py-3 ${s.success > 0 ? 'text-[#009688] font-bold' : 'text-gray-600'}`}
+                    className={`px-4 py-3 ${item.success > 0 ? 'text-[#009688] font-bold' : 'text-gray-600'}`}
                   >
-                    {s.success}
+                    {item.success}
                   </td>
                   <td
-                    className={`px-4 py-3 ${s.info > 0 ? 'text-[#00B3E6] font-bold' : 'text-gray-600'}`}
+                    className={`px-4 py-3 ${item.info > 0 ? 'text-[#00B3E6] font-bold' : 'text-gray-600'}`}
                   >
-                    {s.info}
+                    {item.info}
                   </td>
                   <td
-                    className={`px-4 py-3 text-right ${s.action > 0 ? 'text-[#9C27B0] font-bold' : 'text-gray-600'}`}
+                    className={`px-4 py-3 text-right ${item.action > 0 ? 'text-[#9C27B0] font-bold' : 'text-gray-600'}`}
                   >
-                    {s.action}
+                    {item.action}
                   </td>
                 </tr>
               );
@@ -215,7 +173,7 @@ const HardwareStatsWidget = ({ socket }) => {
                 </table>
               ) : (
                 <div className="flex items-center justify-center h-64 text-gray-500 font-bold uppercase tracking-widest text-[10px]">
-                  No raw logs available for this component.
+                  No raw logs available for this system.
                 </div>
               )}
             </div>

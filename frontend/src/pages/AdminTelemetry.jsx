@@ -2,13 +2,32 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminHeader from '../components/AdminHeader';
 import HardwareStatsWidget from '../components/HardwareStatsWidget';
+import { useTelemetry } from '../context/TelemetryContext';
+import { socket } from '../socket';
 
-const AdminTelemetry = ({ socket }) => {
+const AdminTelemetry = () => {
   const navigate = useNavigate();
+  const { totalAlertsCount } = useTelemetry();
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('adminEmail');
+    navigate('/');
+  };
 
   return (
     <div className="min-h-screen bg-smart-bg dark:bg-gray-900 transition-colors duration-500">
-      <AdminHeader />
+      <AdminHeader
+        title="Live Telemetry"
+        subtitle="Real-time System Matrix"
+        userName={localStorage.getItem('adminEmail')}
+        onLogout={handleLogout}
+        onAlertsClick={() => navigate('/admin/alerts')}
+        onAuditClick={() => navigate('/admin/dashboard')}
+        unreadAlertsCount={totalAlertsCount}
+      />
       <div className="flex flex-col lg:flex-row">
         {/* Sidebar Space Placeholder - matches AdminDashboard layout structure */}
         <aside className="hidden lg:block w-80 flex-shrink-0 border-r border-smart-light/10 p-6 min-h-[calc(100vh-80px)]" />
