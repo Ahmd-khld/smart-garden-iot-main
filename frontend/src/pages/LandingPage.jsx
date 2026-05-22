@@ -127,7 +127,7 @@ const LandingPage = () => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth="2"
-                    d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                    d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.071 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"
                   ></path>
                 </svg>
               </div>
@@ -152,6 +152,7 @@ const LandingPage = () => {
                     strokeWidth="2"
                     d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                   ></path>
+                  <circle cx="12" cy="11" r="1" fill="currentColor" />
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-smart-dark dark:text-white mb-2">Smart Bins</h3>
@@ -171,7 +172,7 @@ const LandingPage = () => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth="2"
-                    d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+                    d="M12 21.5c-3.3 0-6-2.7-6-6 0-3.3 3.5-8.5 5.4-11 .3-.4.9-.4 1.2 0 1.9 2.5 5.4 7.7 5.4 11 0 3.3-2.7 6-6 6z"
                   ></path>
                 </svg>
               </div>
@@ -233,13 +234,17 @@ const ForgotPasswordModal = ({ show, onClose, email, setEmail, onSubmit, isLoadi
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
       <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden border border-smart-light/20 transform transition-all scale-100">
         <div className="bg-smart-dark p-8 flex justify-between items-center border-b border-white/10">
           <h2 className="text-2xl font-black text-smart-glow italic uppercase tracking-tighter text-white">
             Reset Access
           </h2>
-          <button onClick={onClose} className="text-white hover:text-smart-glow transition-colors">
+          <button 
+            onClick={onClose} 
+            className="text-white hover:text-smart-glow transition-colors p-2 rounded-full hover:bg-white/5"
+            aria-label="Close modal"
+          >
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -254,27 +259,31 @@ const ForgotPasswordModal = ({ show, onClose, email, setEmail, onSubmit, isLoadi
         <div className="p-10">
           {message.text && (
             <div
-              className={`mb-6 p-4 rounded-2xl font-bold text-sm border ${message.type === 'success' ? 'bg-smart-light/10 border-smart-light text-smart-dark dark:text-smart-glow' : 'bg-red-50 border-red-500 text-red-700 dark:bg-red-900/30 dark:text-red-200'}`}
+              className={`mb-8 p-5 rounded-2xl font-bold text-sm border-2 ${
+                message.type === 'success' 
+                  ? 'bg-smart-light/5 border-smart-light/30 text-smart-dark dark:text-smart-glow' 
+                  : 'bg-red-50/50 border-red-500/30 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+              }`}
             >
               {message.text}
             </div>
           )}
 
-          <p className="text-smart-gray dark:text-gray-400 mb-8 font-medium">
+          <p className="text-smart-gray dark:text-gray-400 mb-8 font-medium leading-relaxed">
             Enter the email address associated with your account and we'll send you a link to reset
             your password.
           </p>
 
-          <form onSubmit={onSubmit} className="space-y-6">
-            <div>
-              <label className="block text-xs font-black text-smart-dark dark:text-white mb-3 uppercase tracking-widest">
+          <form onSubmit={onSubmit} className="flex flex-col gap-6">
+            <div className="w-full relative">
+              <label className="block text-left text-[10px] font-black text-smart-dark dark:text-white mb-3 uppercase tracking-widest">
                 Email Address
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-6 py-4 rounded-2xl border-2 border-smart-light/10 bg-smart-bg dark:bg-gray-700 text-smart-dark dark:text-white focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition font-medium"
+                className="w-full px-6 py-4 rounded-2xl border-2 border-smart-light/10 bg-smart-bg dark:bg-gray-700 text-smart-dark dark:text-white focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition-all font-bold placeholder-gray-400 dark:placeholder-gray-500"
                 placeholder="you@example.com"
                 required
               />
@@ -283,9 +292,21 @@ const ForgotPasswordModal = ({ show, onClose, email, setEmail, onSubmit, isLoadi
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl hover:-translate-y-1 ${isLoading ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-smart-light hover:bg-smart-dark text-white'}`}
+              className={`w-full py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-smart-light/10 hover:shadow-2xl hover:-translate-y-1 active:scale-95 ${
+                isLoading 
+                  ? 'bg-gray-400 text-white cursor-not-allowed opacity-50' 
+                  : 'bg-smart-light hover:bg-smart-dark text-white'
+              }`}
             >
-              {isLoading ? 'Processing...' : 'Send Reset Link'}
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Processing...
+                </span>
+              ) : 'Send Reset Link'}
             </button>
           </form>
         </div>

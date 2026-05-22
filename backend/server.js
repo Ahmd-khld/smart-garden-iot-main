@@ -247,7 +247,8 @@ app.post('/api/admin/backups/:filename/restore', requireSuperAdmin, async (req, 
 
 io.on('connection', (socket) => {
   // Allow admins to join any user room, and users to join their OWN room
-  socket.on('joinUserRoom', (userId) => {
+  socket.on('joinUserRoom', (rawUserId) => {
+    const userId = String(rawUserId);
     if (socket.user.role === 'admin' || socket.user.role === 'sub-admin' || socket.user._id.toString() === userId) {
       socket.join(`user-${userId}-tickets`);
       console.log(`Socket ${socket.id} joined room: user-${userId}-tickets`);

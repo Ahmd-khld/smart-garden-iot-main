@@ -518,9 +518,11 @@ const checkout = async (req, res) => {
         // NEW: Emit targeted update to the specific user's room for Profile page real-time refresh
         if (io) {
           savedTickets.forEach((ticket) => {
-            io.to(`user-${req.user._id}-tickets`).emit('ticketStatusChanged', {
-              ticketId: ticket._id,
-              userId: req.user._id,
+            const roomName = `user-${req.user._id.toString()}-tickets`;
+            console.log(`[Socket Debug] Checkout: Emitting TICKET_STATUS_UPDATED to room: ${roomName} for ticket: ${ticket._id}`);
+            io.to(roomName).emit('TICKET_STATUS_UPDATED', {
+              ticketId: ticket._id.toString(),
+              userId: req.user._id.toString(),
               status: ticket.status,
               updatedAt: ticket.createdAt,
               ticket: ticket,
@@ -647,7 +649,7 @@ const cancelTicket = async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       // NEW: Emit targeted update to the specific user's room for real-time refresh
-      io.to(`user-${req.user._id}-tickets`).emit('ticketStatusChanged', {
+      io.to(`user-${req.user._id}-tickets`).emit('TICKET_STATUS_UPDATED', {
         ticketId: ticket._id,
         userId: req.user._id,
         status: 'CANCELLED',
@@ -756,7 +758,7 @@ const rescheduleTicket = async (req, res) => {
     // NEW: Emit targeted update to the specific user's room for real-time refresh
     const io = req.app.get('io');
     if (io) {
-      io.to(`user-${req.user._id}-tickets`).emit('ticketStatusChanged', {
+      io.to(`user-${req.user._id}-tickets`).emit('TICKET_STATUS_UPDATED', {
         ticketId: ticket._id,
         userId: req.user._id,
         status: ticket.status,

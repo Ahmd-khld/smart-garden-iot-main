@@ -60,7 +60,9 @@ const handleExpirations = async () => {
             };
             
             // Emit to the specific user room (Admin dashboard listeners)
-            io.to(`user-${ticket.userId.toString()}-tickets`).emit('ticketStatusChanged', payload);
+            const roomName = `user-${ticket.userId.toString()}-tickets`;
+            console.log(`[Socket Debug] Cron Expiration: Emitting TICKET_STATUS_UPDATED to room: ${roomName} for ticket: ${ticket._id}`);
+            io.to(roomName).emit('TICKET_STATUS_UPDATED', payload);
             // Global broadcast for general admin view updates
             io.emit('globalTicketUpdate', payload);
           });

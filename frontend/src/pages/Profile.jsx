@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import html2canvas from 'html2canvas';
@@ -26,33 +26,81 @@ const Profile = () => {
 
   const navigate = useNavigate();
 
+  const fetchTickets = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const ticketsRes = await api.get('/tickets/history', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTickets(ticketsRes.data);
+      console.log('[Socket Debug] Tickets re-fetched from server');
+    } catch (error) {
+      console.error('Error re-fetching tickets:', error);
+    }
+  }, []);
+
   // Socket connection & Room management
   useEffect(() => {
     if (!user?._id) return;
 
+    const token = localStorage.getItem('token');
+    socket.auth = { token };
     socket.connect();
-    socket.emit('joinUserRoom', user._id);
+    
+    socket.on('connect', () => {
+      console.log('[Socket Debug] Connected to server. Socket ID:', socket.id);
+      socket.emit('joinUserRoom', String(user._id));
+      console.log('[Socket Debug] Emitted joinUserRoom for:', String(user._id));
+    });
 
     const handleTicketUpdate = (payload) => {
-      setTickets((prevTickets) => {
-        const index = prevTickets.findIndex((t) => t._id === payload.ticketId);
+      console.log("WebSocket payload received:", payload);
+      const updatedTicketData = payload.ticket || {};
+      const targetId = String(payload.ticketId || updatedTicketData._id);
+      
+      if (!targetId) return;
+
+      // UPDATE LOCAL STATE IMMEDIATELY FOR INSTANT FEEDBACK
+      setTickets((prev) => {
+        const index = prev.findIndex((t) => String(t._id) === targetId);
+        
         if (index !== -1) {
-          const updated = [...prevTickets];
-          updated[index] = { ...updated[index], ...payload.ticket };
+          console.log('[Socket Debug] Updating existing ticket via state injection at index:', index);
+          const updated = [...prev];
+          updated[index] = { 
+            ...updated[index], 
+            ...updatedTicketData, 
+            status: payload.status || updatedTicketData.status || updated[index].status,
+            paymentStatus: payload.paymentStatus || updatedTicketData.paymentStatus || updated[index].paymentStatus
+          };
           return updated;
         } else {
-          return [payload.ticket, ...prevTickets];
+          console.log('[Socket Debug] Adding new ticket to list via state injection');
+          return [updatedTicketData, ...prev];
         }
       });
+
+      // ALSO TRIGGER A BACKGROUND FETCH TO ENSURE FULL DATA INTEGRITY
+      fetchTickets();
     };
 
-    socket.on('ticketStatusChanged', handleTicketUpdate);
+    const handleRefreshFallback = () => {
+      console.log('[Socket Debug] dataRefresh received, forcing ticket re-fetch');
+      fetchTickets();
+    };
+
+    socket.on('TICKET_STATUS_UPDATED', handleTicketUpdate);
+    socket.on('dataRefresh', handleRefreshFallback);
 
     return () => {
-      socket.emit('leaveUserRoom', user._id);
-      socket.off('ticketStatusChanged', handleTicketUpdate);
+      console.log('[Socket Debug] Cleaning up socket listeners and leaving room.');
+      socket.emit('leaveUserRoom', String(user._id));
+      socket.off('connect');
+      socket.off('TICKET_STATUS_UPDATED', handleTicketUpdate);
+      socket.off('dataRefresh', handleRefreshFallback);
     };
-  }, [user?._id]);
+  }, [user?._id, fetchTickets]);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -75,12 +123,8 @@ const Profile = () => {
         setPhone(data.phone);
         setHasDisability(data.hasDisability);
 
-        // Fetch Tickets
-        const ticketsRes = await api.get('/tickets/history', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        setTickets(ticketsRes.data);
+        // Fetch Tickets initial
+        fetchTickets();
       } catch (error) {
         console.error('Error fetching profile data:', error);
         if (error.response?.status === 401) {
@@ -90,7 +134,7 @@ const Profile = () => {
     };
 
     fetchAllData();
-  }, [navigate]);
+  }, [navigate, fetchTickets]);
 
   const handleUpdateInfo = async (e) => {
     e.preventDefault();
@@ -143,7 +187,7 @@ const Profile = () => {
         }
       );
 
-      setTickets(tickets.map((t) => (t._id === ticketId ? { ...t, status: 'cancelled' } : t)));
+      setTickets((prev) => prev.map((t) => (t._id === ticketId ? { ...t, status: 'cancelled' } : t)));
       if (selectedQrTicket?._id === ticketId) setSelectedQrTicket(null);
       showModal(
         'Ticket cancelled successfully! Your refund has been initiated.',
@@ -193,6 +237,7 @@ const Profile = () => {
     );
   }
 
+  console.log("Re-rendering ticket list", tickets);
   return (
     <div className="min-h-screen bg-smart-bg dark:bg-black py-6 md:py-12 px-4 md:px-6 font-sans text-smart-gray dark:text-gray-300 transition-colors duration-300">
       <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-6 md:gap-10">
@@ -395,7 +440,7 @@ const Profile = () => {
                         return (
                       <div
                         key={ticket._id}
-                        className="bg-white dark:bg-gray-700 rounded-3xl shadow-md border border-smart-light/20 p-8 hover:shadow-lg transition-shadow flex flex-col justify-between h-full"
+                        className="bg-white dark:bg-gray-700 rounded-3xl shadow-md border border-smart-light/20 p-8 hover:shadow-lg transition-all duration-300 animate-fade-in flex flex-col justify-between h-full"
                       >
                         <div className="flex justify-between items-start mb-6">
                           <div>
@@ -436,7 +481,7 @@ const Profile = () => {
                                 </p>
                               </div>
                             )}
-                            {ticket.status === 'ACTIVE' && (
+                            {safeStatus === 'active' && (
                               <button
                                 onClick={() => setSelectedQrTicket(ticket)}
                                 className="text-xs bg-smart-light hover:bg-smart-dark text-white font-black uppercase tracking-widest py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95"
@@ -447,7 +492,7 @@ const Profile = () => {
                           </div>
                         </div>
 
-                        {ticket.status === 'ACTIVE' && (
+                        {safeStatus === 'active' && (
                           <div className="flex gap-3 mt-auto mb-4">
                             {ticket.subscriptionPlan === 'one-time' && !ticket.hasRescheduled && (
                               <button

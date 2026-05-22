@@ -73,20 +73,28 @@ const broadcastTicketStatus = (req, ticket) => {
   const io = req.app.get('io');
   if (!io) return;
 
+  const ticketData = typeof ticket.toObject === 'function' ? ticket.toObject() : ticket;
+  
   const payload = {
-    ticketId: ticket._id,
-    userId: ticket.userId,
+    ticketId: ticket._id.toString(),
+    userId: ticket.userId.toString(),
     status: ticket.status,
+    paymentStatus: ticket.paymentStatus,
     updatedAt: ticket.updatedAt,
-    ticket: ticket, // Send full object for instant frontend updates
+    ticket: ticketData,
   };
 
-  // 1. Emit to the specific user room (e.g. for User Tickets View)
-  io.to(`user-${ticket.userId}-tickets`).emit('ticketStatusChanged', payload);
-  // Keep legacy event for backward compatibility
-  io.to(`user-${ticket.userId}-tickets`).emit('ticketScanned', payload);
-
-  // 2. Global broadcast for admin monitoring if needed
+  const roomName = `user-${ticket.userId.toString()}-tickets`;
+  console.log(`[Socket Debug] broadcastTicketStatus: Sending TICKET_STATUS_UPDATED to ${roomName}`);
+  
+  // Send the specific update
+  io.to(roomName).emit('TICKET_STATUS_UPDATED', payload);
+  
+  // Fallback: Notify the client to re-fetch if they missed the specific update
+  io.to(roomName).emit('dataRefresh');
+  
+  // Global/Legacy broadcasts
+  io.to(roomName).emit('ticketScanned', payload);
   io.emit('globalTicketUpdate', payload);
 };
 
@@ -549,7 +557,7 @@ const scanUserTicket = async (req, res) => {
         updatedAt: ticket.updatedAt,
         ticket,
       };
-      io.to(`user-${userId}-tickets`).emit('ticketStatusChanged', payload);
+      io.to(`user-${userId}-tickets`).emit('TICKET_STATUS_UPDATED', payload);
       io.to(`user-${userId}-tickets`).emit('ticketScanned', payload);
     }
 
@@ -1554,18 +1562,12 @@ const activateCashTicket = async (req, res) => {
     // Explicitly save before response or emissions
     await ticket.save();
 
-    // Emit targeted socket event to the user's specific room
+    // Emit targeted socket event to the user's specific room using standard helper
+    broadcastTicketStatus(req, ticket);
+
+    // Notify admin room for real-time dashboard updates
     const io = req.app.get('io');
     if (io) {
-      io.to(`user-${ticket.userId}-tickets`).emit('ticketStatusChanged', {
-        ticketId: ticket._id,
-        status: 'ACTIVE',
-        paymentStatus: 'PAID',
-        updatedAt: ticket.updatedAt,
-        ticket,
-      });
-
-      // Notify admin room for real-time dashboard updates
       io.to('admin-room').emit('cashTicketCollected', ticket._id);
       io.to('admin-room').emit('dashboardStatsUpdated');
       

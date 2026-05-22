@@ -2,9 +2,24 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 
 const WeatherWidget = () => {
-  const [weather, setWeather] = useState(null);
+  const [weather, setWeather] = useState(() => {
+    // Try to load cached weather on initialization
+    try {
+      const cached = localStorage.getItem('weather_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        // Only use if less than 1 hour old
+        if (Date.now() - parsed.timestamp < 3600000) {
+          return parsed.data;
+        }
+      }
+    } catch (e) {
+      console.error('Weather cache read error:', e);
+    }
+    return null;
+  });
   const [hasError, setHasError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!weather);
 
   useEffect(() => {
     const fetchWeather = async () => {
@@ -15,23 +30,31 @@ const WeatherWidget = () => {
         if (!response.ok) throw new Error('Weather API failed');
         const data = await response.json();
 
-        setWeather({
+        const weatherData = {
           currentTemp: data.current_weather.temperature,
           forecast: data.daily.time.slice(0, 3).map((time, index) => ({
             date: time,
             maxTemp: data.daily.temperature_2m_max[index],
           })),
-        });
+        };
+
+        setWeather(weatherData);
+        // Save to cache
+        localStorage.setItem('weather_cache', JSON.stringify({
+          timestamp: Date.now(),
+          data: weatherData
+        }));
       } catch (err) {
         console.error('Weather fetch error:', err);
-        setHasError(true);
+        // Only show error if we have no cached data
+        if (!weather) setHasError(true);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchWeather();
-  }, []);
+  }, [weather]);
 
   if (isLoading) {
     return (
