@@ -36,6 +36,7 @@ const AdminGRC = () => {
   const [selectedRisk, setSelectedRisk] = useState(null); 
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [scoreFilter, setScoreFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('Open'); // Default to Open for focus
   const [currentPage, setCurrentPage] = useState(1); // Pagination State
   const itemsPerPage = 10;
 
@@ -113,7 +114,7 @@ const AdminGRC = () => {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [categoryFilter, scoreFilter]);
+  }, [categoryFilter, scoreFilter, statusFilter]);
 
   const handleStatusChange = async (controlId, newStatus) => {
     try {
@@ -171,15 +172,59 @@ const AdminGRC = () => {
     try {
       setRemediating(riskId);
       const token = localStorage.getItem('token');
+      
+      // --- INSIDER THREAT SPECIAL HANDLER ---
+      if (riskId.includes('RISK-INSIDER')) {
+        const offendingAdminId = selectedRisk?.offendingAdminId;
+        if (offendingAdminId) {
+          await api.patch(`/admin/users/${offendingAdminId}/restrict`, 
+            { reason: 'Automated GRC Protocol: Critical Insider Abuse Detected' },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          
+          showNotification('Rogue Admin Restricted successfully.', 'success');
+          
+          // Mark as resolved locally and update risk status
+          setExecutedRemediations(prev => new Set(prev).add(`${riskId}-${action}`));
+          setRiskRegister(prev => prev.map(r => r.id === riskId ? { ...r, status: 'Resolved' } : r));
+          
+          if (selectedRisk && selectedRisk.id === riskId) {
+            setSelectedRisk({ ...selectedRisk, status: 'Resolved' });
+          }
+          
+          fetchGRCData(false);
+          return;
+        }
+      }
+      // --- END SPECIAL HANDLER ---
+
+      // Execute the standard GRC remediation
       const res = await api.post('/grc/remediate', 
         { riskId, action, params },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+
+      // Automated Account Restriction for Critical Security Violations
+      const isSecurityRisk = action === 'block_user' || action === 'revoke_access' || riskId.includes('ADMIN_UNAUTHORIZED');
+      const targetUserId = params?.userId || params?.adminId || params?.targetUserId;
+
+      if (isSecurityRisk && targetUserId) {
+        try {
+          await api.patch(`/admin/users/${targetUserId}/restrict`, 
+            { reason: `Automated GRC Protocol: Critical Security Violation Detected (${riskId})` },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          console.log(`[GRC] Account ${targetUserId} restricted successfully via unified endpoint.`);
+        } catch (restrictErr) {
+          // Silent fail for secondary restriction if the backend remediate already handled it
+          console.warn('[GRC] Secondary restriction attempt bypassed:', restrictErr.response?.data?.message || restrictErr.message);
+        }
+      }
       
       // Mark as executed locally
       setExecutedRemediations(prev => new Set(prev).add(`${riskId}-${action}`));
       
-      showNotification(res.data.message || 'Remediation successful!');
+      showNotification(res.data.message || 'Risk Resolved & Account Restricted');
       fetchGRCData(false);
     } catch (err) {
       console.error('Remediation Error:', err);
@@ -194,6 +239,13 @@ const AdminGRC = () => {
     if (score >= 12) return 'text-orange-500';
     if (score >= 6) return 'text-yellow-500';
     return 'text-green-500';
+  };
+
+  const getOverallScoreBadgeClass = (score) => {
+    if (score >= 20) return 'bg-red-500/20 text-red-500 border-red-500/30';
+    if (score >= 12) return 'bg-orange-500/20 text-orange-500 border-orange-500/30';
+    if (score >= 6) return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30';
+    return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
   };
 
   const getScorePillClass = (score) => {
@@ -227,13 +279,27 @@ const AdminGRC = () => {
     .filter(r => {
       const score = r.likelihood * r.impact;
       const matchesCategory = categoryFilter === 'All' || r.category === categoryFilter;
+      const matchesStatus = statusFilter === 'All' || (r.status || '').toLowerCase() === statusFilter.toLowerCase();
+      
       let matchesScore = true;
-      if (scoreFilter === 'High (>15)') matchesScore = score > 15;
-      else if (scoreFilter === 'Medium (5-15)') matchesScore = score >= 5 && score <= 15;
-      else if (scoreFilter === 'Low (<5)') matchesScore = score < 5;
-      return matchesCategory && matchesScore;
+      if (scoreFilter === 'High') matchesScore = score > 15;
+      else if (scoreFilter === 'Medium') matchesScore = score >= 5 && score <= 15;
+      else if (scoreFilter === 'Low') matchesScore = score < 5;
+      
+      return matchesCategory && matchesScore && matchesStatus;
     })
-    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    .sort((a, b) => {
+      const scoreA = (a.likelihood || 0) * (a.impact || 0);
+      const scoreB = (b.likelihood || 0) * (b.impact || 0);
+      
+      // Sort by score descending
+      if (scoreB !== scoreA) {
+        return scoreB - scoreA;
+      }
+      
+      // Tie-breaker: sort by most recent detection date
+      return new Date(b.createdAt || b.timestamp || 0) - new Date(a.createdAt || a.timestamp || 0);
+    });
 
   const categories = ['All', ...new Set(riskRegister.map(r => r.category))];
 
@@ -329,7 +395,7 @@ const AdminGRC = () => {
                     <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
                   </div>
                   <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] block mb-1">Total Active Risks</span>
-                  <div className="text-4xl font-black italic text-white">{riskRegister.length}</div>
+                  <div className="text-4xl font-black italic text-white">{riskRegister.filter(r => (r.status || '').toLowerCase() !== 'resolved').length}</div>
                 </div>
 
                 <div className="bg-[#151921] border border-[#2B2F3A] p-6 rounded-2xl relative overflow-hidden group">
@@ -337,7 +403,7 @@ const AdminGRC = () => {
                     <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                   </div>
                   <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] block mb-1">Critical Risks</span>
-                  <div className="text-4xl font-black italic text-red-500">{riskRegister.filter(r => (r.likelihood * r.impact) >= 20).length}</div>
+                  <div className="text-4xl font-black italic text-red-500">{riskRegister.filter(r => (r.likelihood * r.impact) >= 20 && (r.status || '').toLowerCase() !== 'resolved').length}</div>
                 </div>
 
                 <div className="bg-[#151921] border border-[#2B2F3A] p-6 rounded-2xl relative overflow-hidden group">
@@ -409,31 +475,69 @@ const AdminGRC = () => {
 
           {activeTab === 'Risk Register' && (
             <div className="space-y-6">
-              {/* Dual Filter Bar */}
-              <div className="bg-[#151921] border border-[#2B2F3A] p-6 rounded-2xl flex flex-wrap items-center gap-8 shadow-xl">
-                <div className="flex items-center gap-4">
-                  <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.15em]">Category Filter</span>
+              {/* Premium Enterprise Filter Bar */}
+              <div className="bg-[#151921] border border-[#2B2F3A] p-6 rounded-2xl flex flex-wrap items-center gap-6 shadow-2xl relative overflow-hidden">
+                {/* Decorative Accent */}
+                <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/50"></div>
+                
+                <div className="flex flex-col gap-2 min-w-[200px]">
+                  <span className="text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] flex items-center gap-2">
+                    <svg className="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                    Risk Category
+                  </span>
                   <select 
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 text-slate-200 text-xs font-black uppercase rounded-xl px-4 py-2.5 outline-none focus:border-emerald-500 transition-all cursor-pointer ring-1 ring-white/5 shadow-inner"
+                    className="bg-[#1D212A] border border-[#2B2F3A] text-slate-200 text-[11px] font-black uppercase tracking-widest rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-all cursor-pointer shadow-inner hover:bg-[#252a35]"
                   >
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  <span className="text-[10px] font-black uppercase text-slate-500 tracking-[0.15em]">Score Filter</span>
+                <div className="flex flex-col gap-2 min-w-[180px]">
+                  <span className="text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] flex items-center gap-2">
+                    <svg className="w-3 h-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    Severity Score
+                  </span>
                   <select 
                     value={scoreFilter}
                     onChange={(e) => setScoreFilter(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 text-slate-200 text-xs font-black uppercase rounded-xl px-4 py-2.5 outline-none focus:border-emerald-500 transition-all cursor-pointer ring-1 ring-white/5 shadow-inner"
+                    className="bg-[#1D212A] border border-[#2B2F3A] text-slate-200 text-[11px] font-black uppercase tracking-widest rounded-xl px-4 py-3 outline-none focus:border-emerald-500 transition-all cursor-pointer shadow-inner hover:bg-[#252a35]"
                   >
-                    <option value="All">All</option>
-                    <option value="High (>15)">High ({'>'}15)</option>
-                    <option value="Medium (5-15)">Medium (5-15)</option>
-                    <option value="Low (<5)">Low ({'<'}5)</option>
+                    <option value="All">All Severities</option>
+                    <option value="High">High Criticality</option>
+                    <option value="Medium">Medium Priority</option>
+                    <option value="Low">Low Observation</option>
                   </select>
+                </div>
+
+                <div className="flex flex-col gap-2 min-w-[180px]">
+                  <span className="text-[9px] font-black uppercase text-gray-500 tracking-[0.2em] flex items-center gap-2">
+                    <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Operational Status
+                  </span>
+                  <div className="flex bg-[#1D212A] border border-[#2B2F3A] rounded-xl p-1 shadow-inner">
+                    {['All', 'Open', 'Resolved'].map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => setStatusFilter(status)}
+                        className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                          statusFilter === status 
+                          ? 'bg-emerald-500 text-black shadow-lg' 
+                          : 'text-gray-500 hover:text-gray-300'
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex-1 hidden xl:flex justify-end items-end pb-1">
+                  <div className="text-right">
+                    <div className="text-[9px] font-black text-gray-600 uppercase tracking-[0.3em]">Filtered Posture</div>
+                    <div className="text-xl font-black text-white italic">{filteredRisks.length} <span className="text-xs text-gray-500 not-italic">Risks</span></div>
+                  </div>
                 </div>
               </div>
 
@@ -444,43 +548,44 @@ const AdminGRC = () => {
                       <tr className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em]">
                         <th className="px-4 py-5 w-24">Risk ID</th>
                         <th className="px-4 py-5 w-32">Category</th>
-                        <th className="px-4 py-5 w-1/2">Description</th>
-                        <th className="px-4 py-5 w-24 text-center">Likelihood</th>
-                        <th className="px-4 py-5 w-24 text-center">Impact</th>
+                        <th className="px-4 py-5 w-32">Detected</th>
+                        <th className="px-4 py-5 w-1/3">Description</th>
+                        <th className="px-4 py-5 w-24 text-center">Score</th>
                         <th className="px-4 py-5 w-24 text-right">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#2B2F3A]">
-                      {filteredRisks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((risk) => (
-                        <tr 
-                          key={risk.id}
-                          onClick={() => setSelectedRisk(risk)}
-                          className={`transition-colors cursor-pointer group ${selectedRisk?.id === risk.id ? 'bg-emerald-500/10' : 'hover:bg-[#1D212A]/30'}`}
-                        >
-                          <td className="px-4 py-6 font-mono text-sm font-medium text-emerald-400 truncate pr-4">{risk.id}</td>
-                          <td className="px-4 py-6 text-sm truncate pr-4">
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-gray-800 text-slate-300 border border-white/5">{risk.category}</span>
-                          </td>
-                          <td className="px-4 py-6 text-sm truncate text-slate-200 font-medium pr-4 max-w-0" title={risk.description}>
-                            {risk.description}
-                          </td>
-                          <td className="px-4 py-6 text-center truncate">
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black border ${getScorePillClass(risk.likelihood)}`}>
-                              {risk.likelihood}
-                            </span>
-                          </td>
-                          <td className="px-4 py-6 text-center truncate">
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black border ${getScorePillClass(risk.impact)}`}>
-                              {risk.impact}
-                            </span>
-                          </td>
-                          <td className="px-4 py-6 text-right truncate">
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border shadow-sm ${getStatusBadgeClass(risk.status)} text-white`}>
-                              {risk.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      {filteredRisks.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((risk) => {
+                        const calculatedScore = risk.likelihood * risk.impact;
+                        return (
+                          <tr 
+                            key={risk.id}
+                            onClick={() => setSelectedRisk(risk)}
+                            className={`transition-colors cursor-pointer group ${selectedRisk?.id === risk.id ? 'bg-emerald-500/10' : 'hover:bg-[#1D212A]/30'}`}
+                          >
+                            <td className="px-4 py-6 font-mono text-sm font-medium text-emerald-400 truncate pr-4">{risk.id}</td>
+                            <td className="px-4 py-6 text-sm truncate pr-4">
+                              <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-gray-800 text-slate-300 border border-white/5">{risk.category}</span>
+                            </td>
+                            <td className="px-4 py-6 text-[10px] font-bold text-slate-400 truncate pr-4">
+                              {risk.createdAt || risk.timestamp ? new Date(risk.createdAt || risk.timestamp).toLocaleString() : 'Recent Scan'}
+                            </td>
+                            <td className="px-4 py-6 text-sm truncate text-slate-200 font-medium pr-4 max-w-0" title={risk.description}>
+                              {risk.description}
+                            </td>
+                            <td className="px-4 py-6 text-center truncate">
+                              <span className={`px-4 py-1.5 rounded-full text-[11px] font-black border shadow-lg ${getOverallScoreBadgeClass(calculatedScore)}`}>
+                                {calculatedScore}
+                              </span>
+                            </td>
+                            <td className="px-4 py-6 text-right truncate">
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase border shadow-sm ${getStatusBadgeClass(risk.status)} text-white`}>
+                                {risk.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

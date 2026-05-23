@@ -743,36 +743,6 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleUpdateUserRole = async (userId, newRole) => {
-    const roleLabel = newRole === 'admin' ? 'Super Admin' : newRole === 'sub-admin' ? 'Sub-Admin' : 'Standard User';
-    const isConfirmed = await showConfirm(
-      `Are you sure you want to change this user's role to ${roleLabel}? This will immediately update their system access permissions.`,
-      'Change User Role'
-    );
-    if (!isConfirmed) return;
-
-    const token = localStorage.getItem('token');
-    try {
-      const res = await api.patch(
-        `/admin/users/${userId}/role`,
-        { role: newRole },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      showModal(res.data.message, 'Success', 'success');
-
-      // Refresh user lists to reflect role change
-      fetchUsers(currentPageRegular, 'user');
-      if (isSuperAdmin) {
-        fetchUsers(1, 'admin');
-      }
-    } catch (error) {
-      console.error('Failed to update role:', error);
-      showModal(error.response?.data?.message || 'Failed to update role.', 'Error', 'error');
-    }
-  };
-
   const handleResetOccupancy = async () => {
     const isConfirmed = await showConfirm(
       'Are you sure you want to reset the park occupancy? This will archive all currently scanned tickets. This action cannot be undone.',
@@ -1343,7 +1313,7 @@ const AdminDashboard = () => {
       const userName = (t.userId?.name || '').toLowerCase();
       const userEmail = (t.userId?.email || '').toLowerCase();
       const userPhone = (t.userId?.phone || '').toLowerCase();
-      const ticketId = t._id.toString().toLowerCase();
+      const ticketId = (t._id || '').toString().toLowerCase();
 
       return (
         userName.includes(s) ||
@@ -1627,18 +1597,6 @@ const AdminDashboard = () => {
       }
     };
 
-    const onUserStatusUpdate = ({ userId, isBlocked, blockReason }) => {
-      console.log(
-        `🔐 Received User Status Update: ID ${userId}, Blocked: ${isBlocked}, Reason: ${blockReason}`
-      );
-      setRegularUsers((prev) =>
-        prev.map((u) => (u._id === userId ? { ...u, isBlocked, blockReason } : u))
-      );
-      setSubAdmins((prev) =>
-        prev.map((u) => (u._id === userId ? { ...u, isBlocked, blockReason } : u))
-      );
-    };
-
     const onUserUpdated = (updatedUser) => {
       console.log('👤 Received User Update Signal:', updatedUser);
       setRegularUsers((prev) =>
@@ -1704,7 +1662,6 @@ const AdminDashboard = () => {
     socket.on('whitelistIpRemoved', onWhitelistIpRemoved);
     socket.on('subAdminCreated', onSubAdminCreated);
     socket.on('newUserRegistered', onNewUserRegistered);
-    socket.on('userStatusUpdate', onUserStatusUpdate);
     socket.on('userUpdated', onUserUpdated);
     socket.on('userDeleted', onUserDeleted);
     socket.on('subAdminDeleted', onSubAdminDeleted);
@@ -1731,7 +1688,6 @@ const AdminDashboard = () => {
       socket.off('whitelistIpRemoved', onWhitelistIpRemoved);
       socket.off('subAdminCreated', onSubAdminCreated);
       socket.off('newUserRegistered', onNewUserRegistered);
-      socket.off('userStatusUpdate', onUserStatusUpdate);
       socket.off('userUpdated', onUserUpdated);
       socket.off('userDeleted', onUserDeleted);
       socket.off('subAdminDeleted', onSubAdminDeleted);
@@ -1824,7 +1780,7 @@ const AdminDashboard = () => {
           `"${(user.phone || 'N/A').replace(/"/g, '""')}"`,
           `"${user.age || 'N/A'}"`,
           `"${user.role || 'user'}"`,
-          `"${user.isBlocked ? 'Blocked' : 'Active'}"`,
+          `"${user.isRestricted ? 'Restricted' : 'Active'}"`,
           `"${user.hasDisability ? 'Yes' : 'No'}"`,
         ];
         csvRows.push(row.join(','));
@@ -2037,12 +1993,18 @@ const AdminDashboard = () => {
   const { canToggle, allExpanded, toggle: toggleAllPanels } = getTabExpansionState();
 
   const filteredUsers = useMemo(() => {
+    if (!Array.isArray(regularUsers)) return [];
     return regularUsers.filter((user) => {
-      const matchesSearch =
-        user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase());
+      if (!user) return false;
+      const name = user.name || '';
+      const email = user.email || '';
+      const search = (searchQuery || '').toLowerCase();
 
-      const status = filterStatus.toUpperCase();
+      const matchesSearch =
+        name.toLowerCase().includes(search) ||
+        email.toLowerCase().includes(search);
+
+      const status = (filterStatus || 'ALL').toUpperCase();
       let matchesStatus = true;
       if (status === 'ACTIVE') {
         matchesStatus = !user.isRestricted;
@@ -2363,7 +2325,7 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                        {auditLogs.map((log) => (
+                        {Array.isArray(auditLogs) && auditLogs.map((log) => (
                           <tr
                             key={log._id}
                             className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
@@ -2393,10 +2355,10 @@ const AdminDashboard = () => {
                             </td>
                           </tr>
                         ))}
-                        {auditLogs.length === 0 && (
+                        {(!auditLogs || auditLogs.length === 0) && (
                           <tr>
                             <td
-                              colSpan="4"
+                              colSpan="5"
                               className="p-8 text-center text-smart-gray dark:text-gray-500 font-black uppercase tracking-widest text-[10px]"
                             >
                               No audit logs found.
@@ -2527,7 +2489,7 @@ const AdminDashboard = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                          {bannedIPs.map((banned) => (
+                          {Array.isArray(bannedIPs) && bannedIPs.map((banned) => (
                             <tr
                               key={banned._id}
                               className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
@@ -2551,7 +2513,7 @@ const AdminDashboard = () => {
                               </td>
                             </tr>
                           ))}
-                          {bannedIPs.length === 0 && (
+                          {(!bannedIPs || bannedIPs.length === 0) && (
                             <tr>
                               <td
                                 colSpan="4"
@@ -2951,7 +2913,7 @@ const AdminDashboard = () => {
                     ) : insights ? (
                       <>
                         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-                          {insights.days.map((day, index) => (
+                          {Array.isArray(insights.days) && insights.days.map((day, index) => (
                             <div
                               key={index}
                               className={`flex flex-col items-center justify-center py-5 px-2 rounded-xl transition-all cursor-pointer ${
@@ -3140,7 +3102,7 @@ const AdminDashboard = () => {
                       </div>
                     </div>
 
-                    {monthlySales.length > 0 ? (
+                    {Array.isArray(monthlySales) && monthlySales.length > 0 ? (
                       <div className="p-8 overflow-x-auto">
                         <div className="flex items-end justify-between space-x-4 min-w-[600px] h-64 mt-4 mb-4 border-b-2 border-smart-light/20 pb-4">
                           {monthlySales.map((sale, index) => {
@@ -3283,7 +3245,7 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                      {filteredCashTickets.map((ticket) => (
+                      {Array.isArray(filteredCashTickets) && filteredCashTickets.map((ticket) => (
                         <tr
                           key={ticket._id}
                           className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
@@ -3352,7 +3314,7 @@ const AdminDashboard = () => {
                           </td>
                         </tr>
                       ))}
-                      {filteredCashTickets.length === 0 && (
+                      {(!filteredCashTickets || filteredCashTickets.length === 0) && (
                         <tr>
                           <td
                             colSpan="4"
@@ -3505,7 +3467,7 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                        {filteredUsers.map((user) => (
+                        {Array.isArray(filteredUsers) && filteredUsers.map((user) => (
                           <tr
                             key={user._id}
                             className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
@@ -3558,12 +3520,6 @@ const AdminDashboard = () => {
                                 {isSuperAdmin && (
                                   <>
                                     <button
-                                      onClick={() => handleUpdateUserRole(user._id, 'admin')}
-                                      className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-purple-500/10 hover:bg-purple-500/20 text-purple-500 border border-purple-500/20 shadow-sm"
-                                    >
-                                      Make Admin
-                                    </button>
-                                    <button
                                       onClick={() => handleDeleteUser(user._id)}
                                       className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 shadow-sm"
                                     >
@@ -3575,10 +3531,10 @@ const AdminDashboard = () => {
                             </td>
                           </tr>
                         ))}
-                        {filteredUsers.length === 0 && (
+                        {(!filteredUsers || filteredUsers.length === 0) && (
                           <tr>
                             <td
-                              colSpan="4"
+                              colSpan="5"
                               className="p-8 text-center text-smart-gray dark:text-gray-500 font-black uppercase tracking-widest text-[10px]"
                             >
                               No users found matching your criteria.
@@ -3679,7 +3635,7 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                      {subAdmins.map((admin) => (
+                      {Array.isArray(subAdmins) && subAdmins.map((admin) => (
                         <tr
                           key={admin._id}
                           className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
@@ -3697,21 +3653,23 @@ const AdminDashboard = () => {
                           </td>
                           <td className="px-4 py-3 text-center">
                             <div className="flex flex-col items-center space-y-1">
-                              {admin.isRestricted && (
-                                <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-orange-200 dark:border-orange-800">
+                              {admin.isRestricted ? (
+                                <button
+                                  onClick={() =>
+                                    showModal(
+                                      admin.restrictionReason || 'No reason provided',
+                                      'Restriction Details',
+                                      'warning'
+                                    )
+                                  }
+                                  className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-orange-200 dark:border-orange-800 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors"
+                                >
                                   Restricted
-                                </span>
-                              )}
-                              {admin.isBlocked ? (
-                                <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-red-200 dark:border-red-800">
-                                  Blocked
-                                </span>
+                                </button>
                               ) : (
-                                !admin.isRestricted && (
-                                  <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-smart-light/20">
-                                    Active
-                                  </span>
-                                )
+                                <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-smart-light/20">
+                                  Active
+                                </span>
                               )}
                             </div>
                           </td>
@@ -3729,20 +3687,6 @@ const AdminDashboard = () => {
                                   >
                                     View Tickets
                                   </button>
-                                  {admin.isBlocked && (
-                                    <button
-                                      onClick={() =>
-                                        showModal(
-                                          admin.blockReason || 'No reason provided',
-                                          'Restriction Details',
-                                          'warning'
-                                        )
-                                      }
-                                      className="px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
-                                    >
-                                      Reason
-                                    </button>
-                                  )}
                                   <button
                                     onClick={() =>
                                       handleRestrictUser(admin._id, admin.isRestricted)
@@ -3751,24 +3695,12 @@ const AdminDashboard = () => {
                                   >
                                     {admin.isRestricted ? 'Unrestrict' : 'Restrict'}
                                   </button>
-                                  <button
-                                    onClick={() => handleBlockUser(admin._id, admin.isBlocked)}
-                                    className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${admin.isBlocked ? 'bg-smart-light text-white hover:bg-smart-dark shadow-md' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-600 hover:text-white border border-red-200 dark:border-red-800 shadow-sm'}`}
-                                  >
-                                    {admin.isBlocked ? 'Unblock' : 'Block'}
-                                  </button>
-                                  <button
-                                    onClick={() => handleUpdateUserRole(admin._id, 'user')}
-                                    className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 border border-orange-500/20 shadow-sm"
-                                  >
-                                    Make User
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteUser(admin._id)}
-                                    className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 shadow-sm"
-                                  >
-                                    Delete
-                                  </button>
+                                    <button
+                                      onClick={() => handleDeleteUser(admin._id)}
+                                      className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 shadow-sm"
+                                    >
+                                      Delete
+                                    </button>
                                 </>
                               ) : (
                                 <span className="text-[10px] font-black uppercase tracking-widest text-smart-gray dark:text-gray-500 mr-2">
@@ -3779,7 +3711,7 @@ const AdminDashboard = () => {
                           </td>
                         </tr>
                       ))}
-                      {subAdmins.length === 0 && (
+                      {(!subAdmins || subAdmins.length === 0) && (
                         <tr>
                           <td
                             colSpan="4"
@@ -4106,7 +4038,7 @@ const AdminDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                        {whitelistedIPs.map((ip) => (
+                        {Array.isArray(whitelistedIPs) && whitelistedIPs.map((ip) => (
                           <tr
                             key={ip._id}
                             className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
@@ -4133,7 +4065,7 @@ const AdminDashboard = () => {
                             </td>
                           </tr>
                         ))}
-                        {whitelistedIPs.length === 0 && (
+                        {(!whitelistedIPs || whitelistedIPs.length === 0) && (
                           <tr>
                             <td
                               colSpan="5"
@@ -4220,7 +4152,7 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                      {backups.map((backup) => (
+                      {Array.isArray(backups) && backups.map((backup) => (
                         <tr
                           key={backup.filename}
                           className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
@@ -4283,7 +4215,7 @@ const AdminDashboard = () => {
                           </td>
                         </tr>
                       ))}
-                      {backups.length === 0 && (
+                      {(!backups || backups.length === 0) && (
                         <tr>
                           <td
                             colSpan="4"
@@ -4587,7 +4519,7 @@ const AdminDashboard = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                          {filteredAlerts.map((alert) => (
+                          {Array.isArray(filteredAlerts) && filteredAlerts.map((alert) => (
                             <tr
                               key={alert._id || alert.id}
                               className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
@@ -4632,7 +4564,7 @@ const AdminDashboard = () => {
                               </td>
                             </tr>
                           ))}
-                          {filteredAlerts.length === 0 && (
+                          {(!filteredAlerts || filteredAlerts.length === 0) && (
                             <tr>
                               <td
                                 colSpan="3"

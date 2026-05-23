@@ -688,7 +688,7 @@ const createSubAdmin = async (req, res) => {
         email: newAdmin.email,
         phone: newAdmin.phone,
         role: newAdmin.role,
-        isBlocked: newAdmin.isBlocked,
+        isRestricted: newAdmin.isRestricted,
         hasDisability: newAdmin.hasDisability,
         createdAt: newAdmin.createdAt,
       };
@@ -1664,72 +1664,6 @@ const getAlertsBySensor = async (req, res) => {
   }
 };
 
-const updateUserRole = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { role } = req.body;
-
-    if (!['admin', 'sub-admin', 'user'].includes(role)) {
-      return res.status(400).json({ message: 'Invalid role specified' });
-    }
-
-    const user = await User.findById(id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    if (user.email === superAdminEmail) {
-      return res.status(403).json({ message: 'The Super Admin role cannot be changed.' });
-    }
-
-    const oldRole = user.role;
-    user.role = role;
-
-    // Default permissions if promoted to admin/sub-admin
-    if (role === 'admin' || role === 'sub-admin') {
-      user.permissions = {
-        userManagement: true,
-        auditLogs: true,
-        hardwareControl: true,
-        systemSettings: true,
-      };
-    } else {
-      // Clear permissions if demoted to user
-      user.permissions = {
-        userManagement: false,
-        auditLogs: false,
-        hardwareControl: false,
-        systemSettings: false,
-      };
-    }
-
-    await user.save();
-
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('userUpdated', {
-        _id: user._id,
-        role: user.role,
-      });
-    }
-
-    await logAdminAction(
-      req,
-      `Updated role for user ${user.email} from ${oldRole} to ${role}`
-    );
-
-    res.status(200).json({
-      message: `User role updated to ${role}`,
-      user: {
-        _id: user._id,
-        email: user.email,
-        role: user.role,
-      },
-    });
-  } catch (error) {
-    console.error('Update User Role Error:', error);
-    res.status(500).json({ message: 'Error updating user role', details: error.message });
-  }
-};
-
 module.exports = {
   getAdminStats,
   scanTicket,
@@ -1760,5 +1694,4 @@ module.exports = {
   activateCashTicket,
   getPendingCashTickets,
   generateMockData,
-  updateUserRole,
 };

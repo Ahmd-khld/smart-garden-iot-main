@@ -56,6 +56,7 @@ function App() {
   React.useEffect(() => {
     // 1. Listen for account restriction (Instant Kick)
     const handleAccountRestricted = (data) => {
+      if (!data) return;
       const localUserId = localStorage.getItem('userId'); 
       if (localUserId === data.userId) {
         // CLEANUP FIRST

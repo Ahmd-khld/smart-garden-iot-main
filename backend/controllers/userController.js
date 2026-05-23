@@ -167,8 +167,8 @@ const resetPassword = async (req, res) => {
       user.password = password; // Hashing is handled by pre-save middleware
       user.otpAttempts = 0;
       user.deletionDate = null;
-      user.isBlocked = false;
-      user.blockReason = '';
+      user.isRestricted = false;
+      user.restrictionReason = '';
       await user.save();
 
       // Delete OTP after successful reset
@@ -179,8 +179,8 @@ const resetPassword = async (req, res) => {
       user.otpAttempts = (user.otpAttempts || 0) + 1;
 
       if (user.otpAttempts >= 5) {
-        user.isBlocked = true;
-        user.blockReason =
+        user.isRestricted = true;
+        user.restrictionReason =
           'Too many failed verification attempts. Account locked for 30 days and scheduled for deletion.';
         user.deletionDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         await user.save();

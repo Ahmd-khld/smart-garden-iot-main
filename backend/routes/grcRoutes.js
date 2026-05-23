@@ -70,12 +70,34 @@ router.post('/remediate', protect, async (req, res) => {
         break;
 
       case 'block_user':
-        const { email } = params;
-        await User.findOneAndUpdate(
-          { email },
-          { isBlocked: true, blockReason: `GRC Auto-Remediation: ${riskId}` }
+        const { email, userId, targetUserId } = params;
+        const query = userId || targetUserId ? { _id: userId || targetUserId } : { email };
+        const restrictedUser = await User.findOneAndUpdate(
+          query,
+          { isRestricted: true, restrictionReason: `Automated GRC Protocol: ${riskId}` },
+          { new: true }
         );
-        result.message = `User ${email} has been blocked.`;
+
+        if (restrictedUser) {
+          result.message = `User ${restrictedUser.email} has been restricted via GRC auto-remediation.`;
+          
+          // Emit socket events for real-time dashboard updates
+          const io = req.app.get('io');
+          if (io) {
+            io.emit('userUpdated', {
+              _id: restrictedUser._id,
+              isRestricted: true,
+              restrictionReason: restrictedUser.restrictionReason,
+            });
+
+            io.emit('accountRestricted', {
+              userId: restrictedUser._id,
+              message: restrictedUser.restrictionReason,
+            });
+          }
+        } else {
+          result.message = 'Target user not found for restriction.';
+        }
         break;
 
       case 'reset_permissions':
@@ -83,13 +105,13 @@ router.post('/remediate', protect, async (req, res) => {
         await User.findOneAndUpdate(
           { email: targetEmail },
           { 
-            role: 'user',
             "permissions.hardwareControl": false, 
             "permissions.systemSettings": false,
-            "permissions.auditLogs": false 
+            "permissions.auditLogs": false,
+            "permissions.userManagement": false
           }
         );
-        result.message = `Elevated permissions for ${targetEmail} have been revoked and account demoted to user.`;
+        result.message = `Elevated permissions for ${targetEmail} have been revoked. The account role remains unchanged.`;
         break;
 
       case 'clear_backlog':
@@ -157,7 +179,7 @@ router.get('/summary', protect, async (req, res) => {
     stderrData += data.toString();
   });
 
-  child.on('close', (code) => {
+  child.on('close', async (code) => {
     if (code !== 0) {
       console.error('PYTHON_CRITICAL_FAILURE:', stderrData || 'Process exited with code ' + code);
       console.error('Raw Output (stdout):', stdoutData);
@@ -187,6 +209,62 @@ router.get('/summary', protect, async (req, res) => {
       }
 
       const parsedData = JSON.parse(stdoutData);
+
+      // --- INSIDER THREAT DETECTION INJECTION ---
+      try {
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        
+        // Find admins who restricted more than 3 users in last 24h
+        // Note: The action string in logAdminAction (adminController.js) is "Restricted user: ..." or "Unrestricted user: ..."
+        const suspiciousAdmins = await AdminAuditLog.aggregate([
+          {
+            $match: {
+              createdAt: { $gte: twentyFourHoursAgo },
+              status: 'success',
+              action: { $regex: /^Restricted user:/i }
+            }
+          },
+          {
+            $group: {
+              _id: '$email',
+              count: { $sum: 1 }
+            }
+          },
+          {
+            $match: { count: { $gt: 3 } }
+          }
+        ]);
+
+        if (suspiciousAdmins.length > 0) {
+          for (const admin of suspiciousAdmins) {
+            const adminUser = await User.findOne({ email: admin._id }).select('_id');
+            if (adminUser) {
+              parsedData.risk_register.unshift({
+                id: `RISK-INSIDER-${admin._id}`,
+                category: 'Insider Threat',
+                description: `Sub-Admin ${admin._id} has restricted ${admin.count} users in the last 24 hours. This matches an "Insider Abuse" pattern.`,
+                likelihood: 4,
+                impact: 5,
+                status: 'Open',
+                createdAt: new Date().toISOString(),
+                offendingAdminId: adminUser._id,
+                recommendations: [
+                  {
+                    title: 'Restrict Rogue Admin',
+                    priority: 'critical',
+                    body: 'Immediately revoke all access for this administrative account to prevent further unauthorized system manipulation.',
+                    action: 'block_user',
+                    params: { userId: adminUser._id, email: admin._id }
+                  }
+                ]
+              });
+            }
+          }
+        }
+      } catch (logErr) {
+        console.error('Insider Threat Detection Failed:', logErr);
+      }
+      // --- END INJECTION ---
 
       if (parsedData.error) {
         console.error('GRC BRIDGE JSON ERROR:', parsedData.error);

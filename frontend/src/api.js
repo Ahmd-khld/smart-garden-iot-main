@@ -30,7 +30,7 @@ api.interceptors.response.use(
     if (
       error.response &&
       error.response.status === 403 &&
-      (error.response.data.message?.includes('restricted') || error.response.data.isRestricted)
+      (error.response.data?.message?.includes('restricted') || error.response.data?.isRestricted)
     ) {
       // Clear all local auth state
       localStorage.removeItem('token');
@@ -38,7 +38,7 @@ api.interceptors.response.use(
       localStorage.removeItem('adminEmail');
 
       // Force redirect with state
-      const message = error.response.data.message || 'Your account has been restricted.';
+      const message = error.response.data?.message || 'Your account has been restricted.';
       window.location.href = `/login?restrictionReason=${encodeURIComponent(message)}`;
     }
     return Promise.reject(error);

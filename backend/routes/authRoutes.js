@@ -117,8 +117,8 @@ router.post('/verify-email', async (req, res) => {
       user.isVerified = true;
       user.otpAttempts = 0;
       user.deletionDate = null;
-      user.isBlocked = false;
-      user.blockReason = '';
+      user.isRestricted = false;
+      user.restrictionReason = '';
       await user.save();
 
       await OTP.deleteOne({ _id: otpRecord._id });
@@ -136,8 +136,8 @@ router.post('/verify-email', async (req, res) => {
       user.otpAttempts = (user.otpAttempts || 0) + 1;
 
       if (user.otpAttempts >= 5) {
-        user.isBlocked = true;
-        user.blockReason =
+        user.isRestricted = true;
+        user.restrictionReason =
           'Too many failed verification attempts. Account locked for 30 days and scheduled for deletion.';
         user.deletionDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         await user.save();
@@ -174,21 +174,14 @@ router.post('/login', authLimiter, validateRequest(loginValidationSchema), async
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    if (user.isBlocked || user.deletionDate) {
+    if (user.isRestricted || user.deletionDate) {
       const reason = user.deletionDate
         ? 'Account locked and scheduled for deletion due to failed verification.'
-        : user.blockReason || 'No reason provided.';
+        : user.restrictionReason || 'Your account has been restricted. Please contact support.';
       return res.status(403).json({
-        error: `Access Denied: ${reason}`,
-        isBlocked: true,
-        isLocked: !!user.deletionDate,
-      });
-    }
-
-    if (user.isRestricted) {
-      return res.status(403).json({
-        message: 'Your account has been restricted. Please contact support for assistance.',
+        message: reason,
         isRestricted: true,
+        isLocked: !!user.deletionDate,
       });
     }
 
