@@ -139,9 +139,9 @@ const LandingPage = () => {
               </p>
             </div>
             <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-smart-light/20 dark:border-gray-700 hover:shadow-md transition-all group">
-              <div className="w-12 h-12 bg-smart-dark/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-smart-dark transition-colors">
+              <div className="w-12 h-12 bg-emerald-400/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-emerald-400 transition-colors">
                 <svg
-                  className="w-6 h-6 text-smart-dark group-hover:text-white"
+                  className="w-6 h-6 text-emerald-400 group-hover:text-black"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"

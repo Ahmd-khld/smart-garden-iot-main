@@ -85,9 +85,9 @@ const About = () => {
 
           {/* Smart Waste Management */}
           <div className="bg-white dark:bg-gray-800 rounded-[30px] md:rounded-[40px] p-8 md:p-10 shadow-xl border-t-8 border-smart-dark hover:shadow-2xl transition-all transform md:hover:-translate-y-2 dark:border-smart-glow/50">
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-smart-dark/10 rounded-2xl md:rounded-3xl flex items-center justify-center mb-6 md:mb-8 shadow-inner">
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-emerald-400/10 rounded-2xl md:rounded-3xl flex items-center justify-center mb-6 md:mb-8 shadow-inner">
               <svg
-                className="w-8 h-8 md:w-10 md:h-10 text-smart-dark dark:text-smart-glow"
+                className="w-8 h-8 md:w-10 md:h-10 text-emerald-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

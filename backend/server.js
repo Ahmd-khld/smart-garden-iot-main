@@ -25,10 +25,11 @@ const { requireSuperAdmin, requireAdmin } = require('./middleware/superAdminMidd
 
 const ticketRoutes = require('./routes/ticketRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-const userRoutes = require('./routes/userRoutes');
-const authRoutes = require('./routes/authRoutes');
-const gameRoutes = require('./routes/gameRoutes');
+const grcRoutes = require('./routes/grcRoutes');
 const promoRoutes = require('./routes/promoRoutes');
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const gameRoutes = require('./routes/gameRoutes');
 const otpRoutes = require('./routes/otpRoutes');
 
 const app = express();
@@ -183,6 +184,7 @@ app.use('/api/users', userRoutes);
 app.use('/api', authRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/grc', grcRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/promo', promoRoutes);
 app.use('/api/otp', otpRoutes);

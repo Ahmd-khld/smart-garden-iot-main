@@ -9,6 +9,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminHardwareAlerts from './pages/AdminHardwareAlerts';
 import AdminUserTickets from './pages/AdminUserTickets';
 import AdminTelemetry from './pages/AdminTelemetry';
+import AdminGRC from './pages/AdminGRC';
 import Profile from './pages/Profile';
 import ParkMap from './pages/ParkMap';
 import ResetPassword from './pages/ResetPassword';
@@ -150,6 +151,14 @@ function App() {
                 element={
                   <AdminRoute>
                     <AdminTelemetry socket={socket} />
+                  </AdminRoute>
+                }
+              />
+              <Route
+                path="/admin/grc"
+                element={
+                  <AdminRoute>
+                    <AdminGRC />
                   </AdminRoute>
                 }
               />
