@@ -4,8 +4,7 @@ const {
   getAdminStats,
   scanTicket,
   getUsers,
-  toggleBlockUser,
-  restrictUser,
+  toggleRestrictUser,
   createSubAdmin,
   deleteUser,
   resetOccupancy,
@@ -31,6 +30,7 @@ const {
   activateCashTicket,
   getPendingCashTickets,
   generateMockData,
+  updateUserRole,
 } = require('../controllers/adminController');
 const { protect } = require('../middleware/authMiddleware');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/superAdminMiddleware');
@@ -46,8 +46,8 @@ router.get('/users/:userId/tickets', requireAdmin, getUserTickets);
 router.post('/users/:userId/tickets/:ticketId/scan', requireAdmin, scanUserTicket);
 router.put('/activate-cash-ticket/:id', requireAdmin, activateCashTicket);
 router.get('/pending-cash-tickets', requireAdmin, getPendingCashTickets);
-router.patch('/users/:id/block', requireAdmin, toggleBlockUser);
-router.put('/users/:id/restrict', requireAdmin, restrictUser);
+router.patch('/users/:id/restrict', requireAdmin, toggleRestrictUser);
+router.patch('/users/:id/role', requireSuperAdmin, updateUserRole);
 router.delete('/users/:id', requireSuperAdmin, deleteUser);
 router.post('/sub-admin', requireSuperAdmin, createSubAdmin);
 router.get('/audit-logs', requireAdmin, validateRequest(adminSearchSchema), getAuditLogs);

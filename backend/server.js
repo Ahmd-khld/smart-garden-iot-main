@@ -189,6 +189,28 @@ app.use('/api/game', gameRoutes);
 app.use('/api/promo', promoRoutes);
 app.use('/api/otp', otpRoutes);
 
+// TEMPORARY TEST TRIGGER FOR GRC DASHBOARD
+app.get('/api/admin/trigger-test-attack', async (req, res) => {
+  try {
+    // Inject a fake hardware attack directly into MongoDB
+    // Note: Using the schema fields present in HardwareAlert.js (message, sensor, type, timeString)
+    await HardwareAlert.create({
+      sensor: 'Network Sniffer',
+      type: 'error',
+      message: 'CRITICAL: Repeated brute force attacks from 192.168.1.50',
+      timeString: new Date().toLocaleTimeString(),
+    });
+    
+    // Optional: Emit a socket event if you want instant UI updates elsewhere
+    if (io) io.emit('dataRefresh');
+    
+    res.send('🔥 Simulated attack successfully injected into MongoDB! Check your GRC dashboard.');
+  } catch (error) {
+    console.error('Trigger Error:', error);
+    res.status(500).send('Failed to inject attack data.');
+  }
+});
+
 app.delete('/api/admin/clear-dummy-tickets', requireSuperAdmin, async (req, res) => {
   try {
     await Ticket.deleteMany({});

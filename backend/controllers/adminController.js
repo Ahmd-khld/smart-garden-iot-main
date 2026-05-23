@@ -13,9 +13,12 @@ const fs = require('fs');
 
 const failedScans = new Map(); // Track failed scan attempts to prevent brute force
 
-const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase();
+const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase().trim();
 
-const isSuperAdmin = (req) => req.user && req.user.email.toLowerCase() === superAdminEmail;
+const isSuperAdmin = (req) => {
+  if (!req.user || !req.user.email) return false;
+  return req.user.email.toLowerCase().trim() === superAdminEmail;
+};
 
 const logAdminAction = async (req, actionDesc) => {
   try {
@@ -407,10 +410,7 @@ const getUsers = async (req, res) => {
     if (status) {
       const s = status.toLowerCase();
       if (s === 'active') {
-        query.isBlocked = false;
         query.isRestricted = false;
-      } else if (s === 'blocked') {
-        query.isBlocked = true;
       } else if (s === 'restricted') {
         query.isRestricted = true;
       }
@@ -572,9 +572,17 @@ const scanUserTicket = async (req, res) => {
   }
 };
 
-const restrictUser = async (req, res) => {
+const toggleRestrictUser = async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  // Validate ObjectId to prevent CastErrors
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: 'Invalid User ID format' });
+  }
+
   try {
-    const user = await User.findById(req.params.id);
+    const user = await User.findById(id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (user.email === superAdminEmail) {
@@ -588,6 +596,7 @@ const restrictUser = async (req, res) => {
     }
 
     user.isRestricted = !user.isRestricted;
+    user.restrictionReason = user.isRestricted ? (reason || 'No reason provided') : '';
     await user.save();
 
     const io = req.app.get('io');
@@ -595,77 +604,33 @@ const restrictUser = async (req, res) => {
       io.emit('userUpdated', {
         _id: user._id,
         isRestricted: user.isRestricted,
+        restrictionReason: user.restrictionReason,
       });
 
       if (user.isRestricted) {
         io.emit('accountRestricted', {
           userId: user._id,
-          message: 'Your account has been restricted. Please contact support.',
+          message: user.restrictionReason || 'Your account has been restricted. Please contact support.',
         });
       }
     }
 
     await logAdminAction(
       req,
-      `Toggled restriction for user: ${user.email} (Restricted: ${user.isRestricted})`
+      `${user.isRestricted ? 'Restricted' : 'Unrestricted'} user: ${user.email}${user.isRestricted ? ' Reason: ' + user.restrictionReason : ''}`
     );
+
     res.status(200).json({
       message: `User has been ${user.isRestricted ? 'restricted' : 'unrestricted'}`,
       isRestricted: user.isRestricted,
+      restrictionReason: user.restrictionReason,
     });
   } catch (error) {
-    console.error('Restrict User Error:', error);
-    res.status(500).json({ message: 'Error updating user restriction status' });
-  }
-};
-
-const toggleBlockUser = async (req, res) => {
-  try {
-    const { blockReason } = req.body;
-    const user = await User.findById(req.params.id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    if (user.email === superAdminEmail) {
-      return res.status(403).json({ message: 'The Super Admin account cannot be blocked.' });
-    }
-
-    if ((user.role === 'admin' || user.role === 'sub-admin') && !isSuperAdmin(req)) {
-      return res
-        .status(403)
-        .json({ message: 'Only the Super Admin can block or unblock sub-admins.' });
-    }
-
-    user.isBlocked = !user.isBlocked;
-
-    if (user.isBlocked) {
-      user.blockReason = blockReason || 'No reason provided';
-    } else {
-      user.blockReason = ''; // Clear reason on unblock
-    }
-
-    await user.save();
-
-    const io = req.app.get('io');
-    if (io) {
-      io.emit('userStatusUpdate', {
-        userId: user._id,
-        isBlocked: user.isBlocked,
-        blockReason: user.blockReason,
-      });
-    }
-
-    await logAdminAction(
-      req,
-      `Toggled block status for user: ${user.email} (Blocked: ${user.isBlocked})${user.isBlocked ? ' Reason: ' + user.blockReason : ''}`
-    );
-    res.status(200).json({
-      message: `User has been ${user.isBlocked ? 'blocked' : 'unblocked'}`,
-      isBlocked: user.isBlocked,
-      blockReason: user.blockReason,
+    console.error('Toggle Restrict User Fatal Error:', error);
+    res.status(500).json({ 
+      message: 'Error updating user restriction status', 
+      details: error.message 
     });
-  } catch (error) {
-    console.error('Block User Error:', error);
-    res.status(500).json({ message: 'Error updating user status' });
   }
 };
 
@@ -1357,7 +1322,8 @@ const generateMockData = async (req, res) => {
         age: Math.floor(Math.random() * 60 + 18),
         role: isLastFew ? 'admin' : 'user',
         isVerified: true,
-        isBlocked: !isLastFew && Math.random() > 0.95,
+        isRestricted: !isLastFew && Math.random() > 0.95,
+        restrictionReason: !isLastFew && Math.random() > 0.95 ? 'Simulation: Automated restriction' : '',
         hasDisability: Math.random() > 0.9,
       });
     }
@@ -1698,12 +1664,77 @@ const getAlertsBySensor = async (req, res) => {
   }
 };
 
+const updateUserRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!['admin', 'sub-admin', 'user'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role specified' });
+    }
+
+    const user = await User.findById(id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (user.email === superAdminEmail) {
+      return res.status(403).json({ message: 'The Super Admin role cannot be changed.' });
+    }
+
+    const oldRole = user.role;
+    user.role = role;
+
+    // Default permissions if promoted to admin/sub-admin
+    if (role === 'admin' || role === 'sub-admin') {
+      user.permissions = {
+        userManagement: true,
+        auditLogs: true,
+        hardwareControl: true,
+        systemSettings: true,
+      };
+    } else {
+      // Clear permissions if demoted to user
+      user.permissions = {
+        userManagement: false,
+        auditLogs: false,
+        hardwareControl: false,
+        systemSettings: false,
+      };
+    }
+
+    await user.save();
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('userUpdated', {
+        _id: user._id,
+        role: user.role,
+      });
+    }
+
+    await logAdminAction(
+      req,
+      `Updated role for user ${user.email} from ${oldRole} to ${role}`
+    );
+
+    res.status(200).json({
+      message: `User role updated to ${role}`,
+      user: {
+        _id: user._id,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('Update User Role Error:', error);
+    res.status(500).json({ message: 'Error updating user role', details: error.message });
+  }
+};
+
 module.exports = {
   getAdminStats,
   scanTicket,
   getUsers,
-  toggleBlockUser,
-  restrictUser,
+  toggleRestrictUser,
   createSubAdmin,
   deleteUser,
   resetOccupancy,
@@ -1729,4 +1760,5 @@ module.exports = {
   activateCashTicket,
   getPendingCashTickets,
   generateMockData,
+  updateUserRole,
 };

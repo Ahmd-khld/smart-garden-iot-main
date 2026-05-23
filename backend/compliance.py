@@ -170,7 +170,7 @@ CIS_V8_CATALOG: list[tuple[str, str, str, str, str, str]] = [
      "Out of scope."),
 ]
 
-CIS_V8_FRAMEWORK = "CIS Controls v8"
+CIS_V8_FRAMEWORK = "CIS_V8"
 
 
 # -----------------------------------------------------------------------------
@@ -375,7 +375,7 @@ def sync_catalog() -> int:
             try:
                 models.upsert_compliance_control(
                     framework=framework_name,
-                    control_id=cid,
+                    controlId=cid,
                     title=title,
                     description=desc,
                     category=cat,
@@ -388,8 +388,8 @@ def sync_catalog() -> int:
     return n
 
 
-def posture(framework: Optional[str] = CIS_V8_FRAMEWORK) -> dict:
-    return models.compliance_summary(framework=framework)
+def posture(framework: Optional[str] = "CIS_V8") -> list[dict]:
+    return models.list_compliance_controls(framework=framework)
 
 
 def list_controls(framework: Optional[str] = CIS_V8_FRAMEWORK,

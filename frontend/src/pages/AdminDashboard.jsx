@@ -627,82 +627,48 @@ const AdminDashboard = () => {
   };
 
   const handleRestrictUser = async (userId, currentStatus) => {
-    const isConfirmed = await showConfirm(
-      `Are you sure you want to ${currentStatus ? 'remove restrictions from' : 'restrict'} this user? ${currentStatus ? 'They will be allowed to log in again.' : 'They will be blocked from logging in and advised to contact support.'}`,
-      currentStatus ? 'Remove Restriction' : 'Restrict User'
-    );
-    if (!isConfirmed) return;
+    let reason = '';
+    if (!currentStatus) {
+      reason = await showPrompt(
+        'Please enter a reason for restricting this user:',
+        'Restrict User',
+        'Violating platform policies'
+      );
+      if (reason === null) return; // User cancelled prompt
+    } else {
+      const isConfirmed = await showConfirm(
+        'Are you sure you want to remove restrictions from this user? They will be allowed to log in again.',
+        'Remove Restriction'
+      );
+      if (!isConfirmed) return;
+    }
 
     const token = localStorage.getItem('token');
     try {
-      const res = await api.put(
+      const res = await api.patch(
         `/admin/users/${userId}/restrict`,
-        {},
+        { reason },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
       showModal(res.data.message, 'Success', 'success');
-      // Update local state
+
+      // Update local state for immediate feedback
+      const updatedData = { 
+        isRestricted: !currentStatus, 
+        restrictionReason: res.data.restrictionReason 
+      };
+
       setRegularUsers((prev) =>
-        prev.map((u) => (u._id === userId ? { ...u, isRestricted: !currentStatus } : u))
+        prev.map((u) => (u._id === userId ? { ...u, ...updatedData } : u))
       );
       setSubAdmins((prev) =>
-        prev.map((u) => (u._id === userId ? { ...u, isRestricted: !currentStatus } : u))
+        prev.map((u) => (u._id === userId ? { ...u, ...updatedData } : u))
       );
     } catch (error) {
       console.error('Failed to restrict user:', error);
       showModal(error.response?.data?.message || 'Action failed.', 'Error', 'error');
-    }
-  };
-
-  const handleBlockUser = async (userId, currentStatus) => {
-    let blockReason = '';
-    if (!currentStatus) {
-      blockReason = await showPrompt(
-        'Please enter a reason for blocking this user:',
-        'Block User',
-        'Violating system policies'
-      );
-      if (blockReason === null) return; // User cancelled prompt
-    }
-
-    const token = localStorage.getItem('token');
-    if (isTokenExpired(token)) {
-      showModal('Your session has expired. Please log in again.', 'Session Expired', 'error');
-      handleLogout();
-      return;
-    }
-    try {
-      const response = await api.patch(
-        `/admin/users/${userId}/block`,
-        { blockReason },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      const updatedReason = response.data.blockReason;
-
-      setRegularUsers((prev) =>
-        prev.map((u) =>
-          u._id === userId ? { ...u, isBlocked: !currentStatus, blockReason: updatedReason } : u
-        )
-      );
-      setSubAdmins((prev) =>
-        prev.map((u) =>
-          u._id === userId ? { ...u, isBlocked: !currentStatus, blockReason: updatedReason } : u
-        )
-      );
-    } catch (error) {
-      console.error('Failed to toggle block status', error);
-      if (error.response?.status === 401) {
-        showModal('Your session has expired. Please log in again.', 'Session Expired', 'error');
-        handleLogout();
-      } else {
-        const errorMessage = error.response?.data?.message || 'Failed to update user status.';
-        showModal(errorMessage, 'Error', 'error');
-      }
     }
   };
 
@@ -774,6 +740,36 @@ const AdminDashboard = () => {
         const errorMessage = error.response?.data?.message || 'Failed to delete user';
         showModal(errorMessage, 'Error', 'error');
       }
+    }
+  };
+
+  const handleUpdateUserRole = async (userId, newRole) => {
+    const roleLabel = newRole === 'admin' ? 'Super Admin' : newRole === 'sub-admin' ? 'Sub-Admin' : 'Standard User';
+    const isConfirmed = await showConfirm(
+      `Are you sure you want to change this user's role to ${roleLabel}? This will immediately update their system access permissions.`,
+      'Change User Role'
+    );
+    if (!isConfirmed) return;
+
+    const token = localStorage.getItem('token');
+    try {
+      const res = await api.patch(
+        `/admin/users/${userId}/role`,
+        { role: newRole },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      showModal(res.data.message, 'Success', 'success');
+
+      // Refresh user lists to reflect role change
+      fetchUsers(currentPageRegular, 'user');
+      if (isSuperAdmin) {
+        fetchUsers(1, 'admin');
+      }
+    } catch (error) {
+      console.error('Failed to update role:', error);
+      showModal(error.response?.data?.message || 'Failed to update role.', 'Error', 'error');
     }
   };
 
@@ -2049,11 +2045,9 @@ const AdminDashboard = () => {
       const status = filterStatus.toUpperCase();
       let matchesStatus = true;
       if (status === 'ACTIVE') {
-        matchesStatus = !user.isBlocked && !user.isRestricted;
+        matchesStatus = !user.isRestricted;
       } else if (status === 'RESTRICTED') {
         matchesStatus = user.isRestricted;
-      } else if (status === 'BLOCKED') {
-        matchesStatus = user.isBlocked;
       }
 
       return matchesSearch && matchesStatus;
@@ -2109,9 +2103,9 @@ const AdminDashboard = () => {
         onLogout={handleLogout}
       />
 
-      <div className="flex flex-grow w-full max-w-[1600px] mx-auto">
+      <div className="flex flex-grow w-full max-w-[1440px] mx-auto px-4 md:px-8">
         {/* Desktop Sidebar Navigation */}
-        <aside className="hidden lg:flex flex-col w-80 p-8 flex-shrink-0">
+        <aside className="hidden lg:flex flex-col w-72 py-6 pr-6 flex-shrink-0">
           <div className="bg-white dark:bg-gray-800 rounded-[30px] p-5 shadow-2xl border border-smart-light/10 dark:border-gray-700 sticky top-8 flex flex-col space-y-2">
             <h3 className="text-[10px] font-black text-smart-gray dark:text-gray-500 uppercase tracking-widest mb-3 px-4 pt-2">
               Admin Modules
@@ -2161,15 +2155,14 @@ const AdminDashboard = () => {
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center px-5 py-4 rounded-xl text-xs font-black uppercase tracking-widest w-full transition-all duration-300 ${activeTab === tab.id ? 'bg-smart-dark text-white shadow-lg transform scale-[1.02] dark:bg-smart-light dark:text-smart-dark' : 'bg-transparent text-smart-gray dark:text-gray-400 hover:bg-smart-light/10 dark:hover:bg-gray-700'}`}
+                className={`flex items-center px-5 py-4 rounded-xl text-xs font-black uppercase tracking-widest w-full transition-all duration-300 ${
+                  activeTab === tab.id
+                    ? 'bg-smart-dark text-white shadow-lg transform scale-[1.02] dark:bg-smart-light dark:text-smart-dark'
+                    : 'bg-transparent text-smart-gray dark:text-gray-400 hover:bg-smart-light/10 dark:hover:bg-gray-700'
+                }`}
               >
                 <svg className="w-5 h-5 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d={tab.icon}
-                  ></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={tab.icon}></path>
                 </svg>
                 {tab.label}
               </button>
@@ -2177,7 +2170,7 @@ const AdminDashboard = () => {
           </div>
         </aside>
 
-        <main className="flex-grow max-w-full lg:max-w-[calc(100%-20rem)] px-6 py-8 w-full">
+        <main className="flex-1 min-w-0 px-6 py-8 w-full">
           {/* Mobile Tab Navigation Menu */}
           <div className="lg:hidden flex flex-nowrap space-x-4 bg-white dark:bg-gray-800 p-3 rounded-3xl mb-8 overflow-x-auto border border-smart-light/20 shadow-xl scrollbar-hide">
             {[
@@ -2225,15 +2218,14 @@ const AdminDashboard = () => {
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center flex-1 shrink-0 justify-center px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${activeTab === tab.id ? 'bg-smart-light text-white shadow-lg transform -translate-y-1' : 'bg-transparent text-smart-gray dark:text-gray-400 hover:bg-smart-light/10 dark:hover:bg-gray-700'}`}
+                className={`flex items-center flex-1 shrink-0 justify-center px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${
+                  activeTab === tab.id
+                    ? 'bg-smart-light text-white shadow-lg transform -translate-y-1'
+                    : 'bg-transparent text-smart-gray dark:text-gray-400 hover:bg-smart-light/10 dark:hover:bg-gray-700'
+                }`}
               >
                 <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d={tab.icon}
-                  ></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={tab.icon}></path>
                 </svg>
                 {tab.label}
               </button>
@@ -2591,8 +2583,8 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'overview' && (
-            <>
-              <div className="flex justify-between items-center mb-8 animate-fade-in-up">
+            <div className="p-4 md:p-8 bg-white dark:bg-gray-800/30 rounded-[40px] border border-smart-light/10 shadow-2xl mb-10 animate-fade-in-up w-full max-w-[1400px] mx-auto">
+              <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-black text-smart-dark dark:text-white uppercase italic tracking-tighter flex items-center">
                   <svg className="w-8 h-8 mr-3 text-smart-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
@@ -2620,9 +2612,9 @@ const AdminDashboard = () => {
                   {isRefreshing ? 'Syncing Ecosystem...' : 'Refresh Live Data'}
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8 mb-10 animate-fade-in-up">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 w-full mb-10">
                 {/* Circular Card 1 */}
-                <div className="relative bg-white dark:bg-gray-800 rounded-full w-[250px] h-[250px] flex flex-col items-center justify-center p-6 shadow-[0_10px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)] border-[10px] border-blue-500/20 hover:border-blue-500/40 transition-all transform hover:scale-105 mx-auto text-center group shrink-0">
+                <div className="relative bg-white dark:bg-gray-800 rounded-full w-[200px] h-[200px] sm:w-[220px] sm:h-[220px] lg:w-[240px] lg:h-[240px] flex-shrink-0 flex flex-col items-center justify-center p-4 shadow-[0_10px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)] border-[10px] border-blue-500/20 hover:border-blue-500/40 transition-all transform hover:scale-105 text-center group">
                   <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mb-3 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -2648,7 +2640,7 @@ const AdminDashboard = () => {
                 </div>
 
                 {/* Circular Card 2 */}
-                <div className="relative bg-white dark:bg-gray-800 rounded-full w-[250px] h-[250px] flex flex-col items-center justify-center p-6 shadow-[0_10px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)] mx-auto text-center transform transition-transform hover:scale-105 group shrink-0">
+                <div className="relative bg-white dark:bg-gray-800 rounded-full w-[200px] h-[200px] sm:w-[220px] sm:h-[220px] lg:w-[240px] lg:h-[240px] flex-shrink-0 flex flex-col items-center justify-center p-4 shadow-[0_10px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)] text-center transform transition-transform hover:scale-105 group">
                   <svg
                     className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none"
                     viewBox="0 0 100 100"
@@ -2697,7 +2689,7 @@ const AdminDashboard = () => {
                       <span className="text-4xl font-black text-smart-light italic leading-none">
                         {stats?.currentOccupancy || 0}
                       </span>
-                      <span className="text-smart-gray dark:text-gray-500 font-bold text-xs uppercase tracking-widest mt-1">
+                      <span className="text-smart-gray dark:text-gray-500 font-bold text-[10px] uppercase tracking-widest mt-1">
                         / {stats?.maxCapacity || 1000} Limit
                       </span>
                     </div>
@@ -2705,7 +2697,7 @@ const AdminDashboard = () => {
                 </div>
 
                 {/* Circular Card 3 */}
-                <div className="relative bg-white dark:bg-gray-800 rounded-full w-[250px] h-[250px] flex flex-col items-center justify-center p-6 shadow-[0_10px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)] border-[10px] border-orange-500/20 hover:border-orange-500/40 transition-all transform hover:scale-105 mx-auto text-center group shrink-0">
+                <div className="relative bg-white dark:bg-gray-800 rounded-full w-[200px] h-[200px] sm:w-[220px] sm:h-[220px] lg:w-[240px] lg:h-[240px] flex-shrink-0 flex flex-col items-center justify-center p-4 shadow-[0_10px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)] border-[10px] border-orange-500/20 hover:border-orange-500/40 transition-all transform hover:scale-105 text-center group">
                   <div className="w-12 h-12 bg-orange-500/10 rounded-full flex items-center justify-center mb-3 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -2731,7 +2723,7 @@ const AdminDashboard = () => {
                 </div>
 
                 {/* Circular Card 4 */}
-                <div className="relative bg-white dark:bg-gray-800 rounded-full w-[250px] h-[250px] flex flex-col items-center justify-center p-6 shadow-[0_10px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)] mx-auto text-center transform transition-transform hover:scale-105 group shrink-0">
+                <div className="relative bg-white dark:bg-gray-800 rounded-full w-[200px] h-[200px] sm:w-[220px] sm:h-[220px] lg:w-[240px] lg:h-[240px] flex-shrink-0 flex flex-col items-center justify-center p-4 shadow-[0_10px_40px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_rgba(0,0,0,0.4)] text-center transform transition-transform hover:scale-105 group">
                   <svg
                     className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none"
                     viewBox="0 0 100 100"
@@ -2783,7 +2775,7 @@ const AdminDashboard = () => {
                       <span className="text-4xl font-black text-smart-dark dark:text-white italic leading-none">
                         {stats?.purchasingUsers || 0}
                       </span>
-                      <span className="text-smart-gray dark:text-gray-500 font-bold text-xs uppercase tracking-widest mt-1">
+                      <span className="text-smart-gray dark:text-gray-500 font-bold text-[10px] uppercase tracking-widest mt-1">
                         of {stats?.activeUsers || 0} Total
                       </span>
                     </div>
@@ -2793,7 +2785,7 @@ const AdminDashboard = () => {
 
               {/* Admin Quick Actions Row */}
               {isSuperAdmin && !isLoadingStats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10 animate-fade-in-up">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <button
                     onClick={handleResetOccupancy}
                     className="py-4 bg-red-600 hover:bg-red-700 text-white text-[10px] font-black uppercase tracking-widest rounded-3xl transition-all shadow-lg hover:shadow-red-900/40 active:scale-95 flex flex-col items-center justify-center gap-2"
@@ -2852,7 +2844,7 @@ const AdminDashboard = () => {
                   </button>
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {canToggle && (
@@ -3497,7 +3489,6 @@ const AdminDashboard = () => {
                         <option value="ALL">ALL STATUSES</option>
                         <option value="ACTIVE">ACTIVE USERS</option>
                         <option value="RESTRICTED">RESTRICTED USERS</option>
-                        <option value="BLOCKED">BLOCKED USERS</option>
                       </select>
                     </div>
                   </div>
@@ -3532,21 +3523,17 @@ const AdminDashboard = () => {
                             </td>
                             <td className="px-4 py-3 text-center">
                               <div className="flex flex-col items-center space-y-1">
-                                {user.isRestricted && (
-                                  <span className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-orange-200 dark:border-orange-800">
+                                {user.isRestricted ? (
+                                  <button
+                                    onClick={() => showModal(user.restrictionReason || 'No reason provided', 'Restriction Details', 'warning')}
+                                    className="bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-orange-200 dark:border-orange-800 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors"
+                                  >
                                     Restricted
-                                  </span>
-                                )}
-                                {user.isBlocked ? (
-                                  <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-red-200 dark:border-red-800">
-                                    Blocked
-                                  </span>
+                                  </button>
                                 ) : (
-                                  !user.isRestricted && (
-                                    <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-smart-light/20">
-                                      Active
-                                    </span>
-                                  )
+                                  <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-smart-light/20">
+                                    Active
+                                  </span>
                                 )}
                               </div>
                             </td>
@@ -3562,39 +3549,27 @@ const AdminDashboard = () => {
                                 >
                                   View Tickets
                                 </button>
-                                {user.isBlocked && (
-                                  <button
-                                    onClick={() =>
-                                      showModal(
-                                        user.blockReason || 'No reason provided',
-                                        'Restriction Details',
-                                        'warning'
-                                      )
-                                    }
-                                    className="px-4 py-2.5 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
-                                  >
-                                    Reason
-                                  </button>
-                                )}
                                 <button
                                   onClick={() => handleRestrictUser(user._id, user.isRestricted)}
                                   className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${user.isRestricted ? 'bg-orange-500 text-white hover:bg-orange-600 shadow-md' : 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-600 hover:text-white border border-orange-200 dark:border-orange-800 shadow-sm'}`}
                                 >
                                   {user.isRestricted ? 'Unrestrict' : 'Restrict'}
                                 </button>
-                                <button
-                                  onClick={() => handleBlockUser(user._id, user.isBlocked)}
-                                  className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${user.isBlocked ? 'bg-smart-light text-white hover:bg-smart-dark shadow-md' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-600 hover:text-white border border-red-200 dark:border-red-800 shadow-sm'}`}
-                                >
-                                  {user.isBlocked ? 'Unblock' : 'Block'}
-                                </button>
                                 {isSuperAdmin && (
-                                  <button
-                                    onClick={() => handleDeleteUser(user._id)}
-                                    className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 shadow-sm"
-                                  >
-                                    Delete
-                                  </button>
+                                  <>
+                                    <button
+                                      onClick={() => handleUpdateUserRole(user._id, 'admin')}
+                                      className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-purple-500/10 hover:bg-purple-500/20 text-purple-500 border border-purple-500/20 shadow-sm"
+                                    >
+                                      Make Admin
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteUser(user._id)}
+                                      className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 shadow-sm"
+                                    >
+                                      Delete
+                                    </button>
+                                  </>
                                 )}
                               </div>
                             </td>
@@ -3781,6 +3756,12 @@ const AdminDashboard = () => {
                                     className={`px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${admin.isBlocked ? 'bg-smart-light text-white hover:bg-smart-dark shadow-md' : 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-600 hover:text-white border border-red-200 dark:border-red-800 shadow-sm'}`}
                                   >
                                     {admin.isBlocked ? 'Unblock' : 'Block'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleUpdateUserRole(admin._id, 'user')}
+                                    className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 border border-orange-500/20 shadow-sm"
+                                  >
+                                    Make User
                                   </button>
                                   <button
                                     onClick={() => handleDeleteUser(admin._id)}

@@ -14,7 +14,6 @@ const userSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: true,
     },
     password: {
       type: String,
@@ -22,7 +21,6 @@ const userSchema = new mongoose.Schema(
     },
     age: {
       type: Number,
-      required: true,
     },
     hasDisability: {
       type: Boolean,
@@ -36,15 +34,11 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    isBlocked: {
-      type: Boolean,
-      default: false,
-    },
     isRestricted: {
       type: Boolean,
       default: false,
     },
-    blockReason: {
+    restrictionReason: {
       type: String,
       default: '',
     },
@@ -54,8 +48,14 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['user', 'admin', 'sub-admin'],
+      enum: ['user', 'admin', 'sub-admin', 'customer', 'viewer'],
       default: 'user',
+    },
+    permissions: {
+      hardwareControl: { type: Boolean, default: false },
+      systemSettings: { type: Boolean, default: false },
+      auditLogs: { type: Boolean, default: false },
+      userManagement: { type: Boolean, default: false },
     },
     savedCards: [
       {

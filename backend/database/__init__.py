@@ -1,1 +1,2 @@
-# Initialize database package
+from .db import db
+from . import models
