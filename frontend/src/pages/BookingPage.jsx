@@ -350,14 +350,16 @@ const BookingPage = () => {
                   <select
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition bg-smart-bg dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 font-bold text-smart-dark dark:text-white"
+                    className="w-full px-5 py-4 rounded-xl border border-gray-200 dark:border-gray-600 focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition bg-smart-bg dark:bg-gray-700 focus:bg-white dark:focus:bg-gray-600 font-bold text-smart-dark dark:text-white appearance-none"
+                    style={{ colorScheme: 'dark' }}
                   >
-                    <option value="">-- Select a Date --</option>
+                    <option value="" style={{ backgroundColor: '#1f2937', color: 'white' }}>-- Select a Date --</option>
                     {insights?.days.map((day) => (
                       <option
                         key={day.date}
                         value={day.date}
                         disabled={day.count >= (insights?.capacity || 200)}
+                        style={{ backgroundColor: '#1f2937', color: 'white' }}
                       >
                         {day.displayDate} -{' '}
                         {day.count >= (insights?.capacity || 200)
@@ -681,7 +683,7 @@ const BookingPage = () => {
                       Quiet (0-30%)
                     </span>
                   </div>
-                  <div className="flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500/5 rounded-full border border-yellow-500/10 shadow-sm">
+                  <div className="flex items-center justify-center gap-2 px-4 py-2 bg-yellow-500/5 rounded-full border border-green-500/10 shadow-sm">
                     <Meh className="w-4 h-4 text-yellow-500 shrink-0" />
                     <span className="text-gray-500 dark:text-gray-400 text-xs font-medium whitespace-nowrap tracking-tight">
                       Moderate (31-70%)

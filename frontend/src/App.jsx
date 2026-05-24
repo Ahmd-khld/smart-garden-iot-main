@@ -52,7 +52,8 @@ const PrivateRoute = ({ children }) => {
 };
 
 function App() {
-  const [darkMode, setDarkMode] = React.useState(getSafeStorage('theme') === 'dark');
+  // Application locked to dark mode per requirement
+  const [darkMode] = React.useState(true);
 
   React.useEffect(() => {
     // 1. Listen for account restriction (Instant Kick)
@@ -80,27 +81,21 @@ function App() {
 
   React.useEffect(() => {
     try {
-      if (darkMode) {
-        document.documentElement.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-      }
+      // Force dark mode implementation
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
     } catch (error) {
       console.warn('Local storage restricted: could not save theme');
     }
-  }, [darkMode]);
-
-  const toggleDarkMode = () => setDarkMode(!darkMode);
+  }, []);
 
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <TelemetryProvider>
-        <div className="min-h-screen bg-smart-bg dark:bg-gray-900 text-smart-gray dark:text-gray-100 font-sans flex flex-col transition-colors duration-500 relative">
+        <div className="min-h-screen bg-[#020617] text-gray-100 font-sans flex flex-col transition-colors duration-500 relative">
           <CloudBackground />
           <div className="relative z-10 flex flex-col min-h-screen">
-            <Navbar darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
+            <Navbar />
             <main className="flex-grow w-full flex flex-col">
               <Routes>
                 <Route path="/" element={<LandingPage />} />

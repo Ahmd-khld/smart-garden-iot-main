@@ -1,15 +1,11 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import ThemeToggle from './ThemeToggle';
-
 import logo from '../assets/logo.png';
 
-const Navbar = ({ darkMode, toggleDarkMode }) => {
+const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Use state to track auth to ensure re-renders on login/logout
-  // We sync this state whenever the location changes as a simple way to track navigation-based auth changes
   const [auth, setAuth] = React.useState({
     token: localStorage.getItem('token'),
     role: localStorage.getItem('role'),
@@ -22,7 +18,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
       token: localStorage.getItem('token'),
       role: localStorage.getItem('role'),
     });
-    setIsMenuOpen(false); // Close menu on navigation
+    setIsMenuOpen(false);
   }, [location]);
 
   const { token, role } = auth || { token: null, role: null };
@@ -32,16 +28,16 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     const isCurrent = location?.pathname === path;
     const base = isMobile
       ? 'block py-4 px-6 transition-all uppercase text-[14px] tracking-widest font-black border-l-4'
-      : 'pb-1 transition-all uppercase text-[13px] tracking-widest font-black whitespace-nowrap shrink-0';
+      : 'pb-1 transition-all uppercase text-[13px] tracking-widest font-black whitespace-nowrap shrink-0 border-b-2';
 
     if (isCurrent) {
       return isMobile
-        ? `${base} border-smart-glow bg-smart-glow/10 text-smart-glow`
-        : `${base} border-b-2 border-smart-glow text-smart-glow`;
+        ? `${base} border-white bg-white/10 text-white`
+        : `${base} border-white text-white`;
     }
     return isMobile
-      ? `${base} border-transparent text-white/70 hover:text-white hover:bg-white/5`
-      : `${base} text-white hover:text-smart-glow`;
+      ? `${base} border-transparent text-white/60 hover:text-white hover:bg-white/5`
+      : `${base} border-transparent text-white/70 hover:text-white hover:border-white/30`;
   };
 
   const handleLogout = () => {
@@ -54,20 +50,17 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
     navigate('/');
   };
 
-  if (!auth) return null;
-
   return (
-    <nav className="bg-smart-dark text-white shadow-xl sticky top-0 z-50 transition-colors duration-300 border-b border-smart-light/20">
+    <nav className="bg-[#0B4228] text-white shadow-2xl sticky top-0 z-50 transition-colors duration-300 border-b-2 border-[#09361a]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 md:h-24 flex justify-between items-center">
-        {/* Logo */}
         <Link
           to="/"
-          className="hover:opacity-90 transition transform shrink-0 z-20 -my-4 md:-my-10"
+          className="hover:opacity-90 transition transform shrink-0 z-20 -my-4 md:-my-8"
         >
           <img
             src={logo}
             alt="Smart Garden Logo"
-            className="h-24 md:h-44 w-auto object-contain drop-shadow-2xl"
+            className="h-24 md:h-36 w-auto object-contain drop-shadow-[0_15px_30px_rgba(0,0,0,0.4)]"
           />
         </Link>
 
@@ -103,11 +96,6 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
             </>
           )}
 
-          {/* Theme Toggle Button */}
-          <div className="shrink-0">
-            <ThemeToggle isDarkMode={darkMode} toggleTheme={toggleDarkMode} />
-          </div>
-
           {isAuthenticated && (
             <Link
               to="/profile"
@@ -128,7 +116,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
           {isAuthenticated && !location.pathname.includes('/admin') && (
             <button
               onClick={handleLogout}
-              className="text-white/70 hover:text-white transition-colors font-bold uppercase text-xs tracking-widest whitespace-nowrap shrink-0"
+              className="text-white/70 hover:text-white transition-colors font-bold uppercase text-xs tracking-widest whitespace-nowrap shrink-0 px-3 py-1.5 rounded-lg border border-transparent hover:border-white/20"
             >
               Logout
             </button>
@@ -137,10 +125,10 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
           {isAuthenticated && (role === 'admin' || role === 'sub-admin') && (
             <Link
               to="/admin/dashboard"
-              className="flex items-center space-x-2 bg-white/10 border border-white/20 hover:bg-white/20 text-smart-glow px-5 py-2.5 rounded-xl font-black transition-all shadow-md transform hover:-translate-y-0.5 whitespace-nowrap shrink-0"
+              className="flex items-center space-x-2 bg-[#0B4228] border border-emerald-500/30 hover:border-emerald-500 text-emerald-400 hover:text-white px-5 py-2 rounded-xl font-black transition-all shadow-[0_0_15px_rgba(16,185,129,0.1)] hover:shadow-[0_0_20px_rgba(16,185,129,0.3)] transform hover:-translate-y-0.5 whitespace-nowrap shrink-0"
             >
               <svg
-                className="w-4 h-4 text-smart-glow"
+                className="w-4 h-4"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -157,12 +145,11 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
           )}
         </div>
 
-        {/* Mobile Actions (Theme + Hamburger) */}
+        {/* Mobile Actions (Hamburger only) */}
         <div className="flex md:hidden items-center space-x-4">
-          <ThemeToggle isDarkMode={darkMode} toggleTheme={toggleDarkMode} />
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors focus:outline-none"
+            className="p-2 rounded-lg bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-colors focus:outline-none"
             aria-label="Toggle Menu"
           >
             {isMenuOpen ? (
@@ -180,7 +167,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
 
       {/* Mobile Menu Dropdown */}
       <div
-        className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out bg-smart-dark/95 backdrop-blur-md border-t border-white/10 ${
+        className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out bg-[#0B4228] border-t border-white/10 ${
           isMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
@@ -221,7 +208,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
           {isAuthenticated && (role === 'admin' || role === 'sub-admin') && (
             <Link
               to="/admin/dashboard"
-              className="mx-4 my-4 flex items-center justify-center space-x-2 bg-smart-glow text-smart-dark py-4 rounded-2xl font-black uppercase tracking-widest text-xs"
+              className="mx-4 my-4 flex items-center justify-center space-x-2 bg-white text-[#0B4228] py-4 rounded-2xl font-black uppercase tracking-widest text-xs"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -233,7 +220,7 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
           {isAuthenticated && (
             <button
               onClick={handleLogout}
-              className="w-full text-left py-4 px-6 text-red-400 font-black uppercase tracking-widest text-[14px] hover:bg-red-500/10 border-l-4 border-transparent"
+              className="w-full text-left py-4 px-6 text-red-300 font-black uppercase tracking-widest text-[14px] hover:bg-red-900/20 border-l-4 border-transparent"
             >
               Logout Account
             </button>
@@ -241,7 +228,6 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
         </div>
       </div>
     </nav>
-
   );
 };
 
