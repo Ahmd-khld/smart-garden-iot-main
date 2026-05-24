@@ -35,7 +35,14 @@ const hardwareRoutes = require('./routes/hardwareRoutes');
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.PORT || 5000;
+const getPort = () => {
+  const pIndex = process.argv.indexOf('-p');
+  if (pIndex !== -1 && process.argv[pIndex + 1]) {
+    return parseInt(process.argv[pIndex + 1]);
+  }
+  return process.env.PORT || 5000;
+};
+const PORT = getPort();
 
 const io = new Server(server, {
   pingTimeout: parseInt(process.env.SOCKET_PING_TIMEOUT) || 60000,
@@ -48,7 +55,7 @@ const io = new Server(server, {
         .map((o) => o.trim())
         .filter(Boolean);
       const isAllowedLocalDevOrigin = (o) =>
-        /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}):517\d$/.test(o);
+        /^https?:\/\/([a-zA-Z0-9.-]+|[\d.]+)(:\d+)?$/.test(o);
       if (!origin || allowedOrigins.includes(origin) || isAllowedLocalDevOrigin(origin)) {
         return callback(null, true);
       }
@@ -98,7 +105,7 @@ app.use(
         .map((o) => o.trim())
         .filter(Boolean);
       const isAllowedLocalDevOrigin = (o) =>
-        /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}):517\d$/.test(o);
+        /^https?:\/\/([a-zA-Z0-9.-]+|[\d.]+)(:\d+)?$/.test(o);
       if (!origin || allowedOrigins.includes(origin) || isAllowedLocalDevOrigin(origin)) {
         return callback(null, true);
       }
@@ -306,6 +313,19 @@ app.use((err, req, res, next) => {
   res.status(statusCode).json({ message: err.message });
 });
 
-server.listen(PORT, () => {
-  console.log(`Backend server is running on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Backend server is running on http://0.0.0.0:${PORT}`);
 });
+
+// Serve static files from the frontend build
+const distPath = path.join(__dirname, '../frontend/dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      res.sendFile(path.join(distPath, 'index.html'));
+    } else {
+      res.status(404).json({ message: 'API route not found' });
+    }
+  });
+}

@@ -1,43 +1,50 @@
 const HardwareAlert = require('../models/HardwareAlert');
+const Telemetry = require('../models/Telemetry');
 const net = require('net');
 
 let espIpAddress = null;
 
 /**
- * Receives live telemetry from ESP8266 and broadcasts it to the dashboard.
+ * Receives live telemetry from ESP8266, logs it to DB, and broadcasts it to the dashboard.
  * Also captures the ESP's IP address for subsequent remote control.
  */
 const receiveTelemetry = async (req, res) => {
-  console.log('[Hardware] Incoming Telemetry:', req.body);
-  const { 
-    moisture, humidity, temperature, 
-    rgbDistance, servoDistance, 
-    ldrStatus, pumpStatus, servoStatus 
-  } = req.body;
+  try {
+    console.log('[Hardware] Incoming Telemetry:', req.body);
+    const { 
+      moisture, humidity, temperature, 
+      rgbDistance, servoDistance, 
+      ldrStatus, pumpStatus, servoStatus 
+    } = req.body;
 
-  // Capture the ESP's IP address (normalized to IPv4)
-  espIpAddress = req.ip.replace('::ffff:', '');
+    // Capture the ESP's IP address (normalized to IPv4)
+    espIpAddress = req.ip.replace('::ffff:', '');
 
-  const telemetryData = {
-    moisture, humidity, temperature,
-    rgbDistance, servoDistance,
-    ldrStatus, pumpStatus, servoStatus,
-    ipAddress: espIpAddress,
-    timestamp: new Date().toISOString()
-  };
+    const telemetryData = {
+      moisture, humidity, temperature,
+      rgbDistance, servoDistance,
+      ldrStatus, pumpStatus, servoStatus,
+      ipAddress: espIpAddress,
+      timestamp: new Date()
+    };
 
-  const io = req.app.get('io');
-  if (io) {
-    console.log('[Hardware] Broadcasting liveTelemetry to all clients...');
-    // Broadcast live readings globally to all connected clients
-    io.emit('liveTelemetry', telemetryData);
-  } else {
-    console.warn('[Hardware] Cannot broadcast: io instance not found on app.');
-  }
+    // 1. LOG TO DATABASE
+    await Telemetry.create(telemetryData);
 
-  // Automated monitoring: Create a persistent alert if sensor values are critical
-  if (moisture > 800) {
-    try {
+    const io = req.app.get('io');
+    if (io) {
+      console.log('[Hardware] Broadcasting liveTelemetry to all clients...');
+      // 2. BROADCAST TO DASHBOARD (send ISO string for frontend compatibility)
+      io.emit('liveTelemetry', {
+        ...telemetryData,
+        timestamp: telemetryData.timestamp.toISOString()
+      });
+    } else {
+      console.warn('[Hardware] Cannot broadcast: io instance not found on app.');
+    }
+
+    // 3. AUTOMATED MONITORING / ALERTS
+    if (moisture > 800) {
       const alert = await HardwareAlert.create({
         sensor: 'Soil Moisture',
         type: 'warning',
@@ -45,12 +52,25 @@ const receiveTelemetry = async (req, res) => {
         timeString: new Date().toLocaleTimeString()
       });
       if (io) io.emit('hardwareAlert', alert);
-    } catch (err) {
-      console.error('Failed to create moisture alert:', err);
     }
-  }
 
-  res.status(200).json({ status: 'success', received: true });
+    res.status(200).json({ status: 'success', received: true });
+  } catch (error) {
+    console.error('[Hardware] Telemetry Process Error:', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+/**
+ * Fetches recent telemetry history for the dashboard.
+ */
+const getTelemetryHistory = async (req, res) => {
+  try {
+    const history = await Telemetry.find().sort({ timestamp: -1 }).limit(50);
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch telemetry history' });
+  }
 };
 
 /**
@@ -88,4 +108,4 @@ const sendControlCommand = async (req, res) => {
   });
 };
 
-module.exports = { receiveTelemetry, sendControlCommand };
+module.exports = { receiveTelemetry, sendControlCommand, getTelemetryHistory };
