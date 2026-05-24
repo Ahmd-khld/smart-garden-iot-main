@@ -4301,7 +4301,8 @@ const AdminDashboard = () => {
                     <div className="flex items-center bg-white dark:bg-gray-800 p-2 rounded-2xl border border-smart-light/10 shadow-sm">
                       <span className="px-4 text-[10px] font-black text-smart-gray dark:text-gray-400 uppercase tracking-widest">Gate Servo</span>
                       <button onClick={() => handleHardwareCommand('SERVO_ON')} className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Open</button>
-                      <button onClick={() => handleHardwareCommand('SERVO_OFF')} className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ml-2">Close</button>
+                      <button onClick={() => handleHardwareCommand('SERVO_OFF')} className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ml-2">Lock</button>
+                      <button onClick={() => handleHardwareCommand('SERVO_AUTO')} className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ml-2">Auto</button>
                     </div>
                     <div className="flex items-center bg-white dark:bg-gray-800 p-2 rounded-2xl border border-smart-light/10 shadow-sm">
                       <span className="px-4 text-[10px] font-black text-smart-gray dark:text-gray-400 uppercase tracking-widest">System Lamp</span>
