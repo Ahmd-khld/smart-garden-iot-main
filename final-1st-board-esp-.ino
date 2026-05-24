@@ -1,11 +1,13 @@
 #include <SoftwareSerial.h>
 #include <Servo.h>
 #include <DHT.h>
+#include <Dhcp.h>
 
 // ===================== ESP SETUP =====================
-SoftwareSerial esp(A4, A5); // RX, TX for ESP (A4 = RX from ESP, A5 = TX to ESP)
-const char* WIFI_SSID = "YourSSID";
-const char* WIFI_PASS = "YourPassword";
+SoftwareSerial esp(A4, A5); // RX, TX (A4 to ESP TX, A5 to ESP RX)
+const char* WIFI_SSID = "test";
+const char* WIFI_PASS = "12345678";
+const char* SERVER_IP = "192.168.137.1"; // Your backend IP
 
 // ===================== PIN DEFINITIONS =====================
 #define MOISTURE_SENSOR_PIN A0
@@ -47,7 +49,6 @@ int lastBand = -1;
 unsigned long lastUpdate = 0;
 const unsigned long UPDATE_INTERVAL = 2000;
 
-// Manual override flags (set by WiFi commands)
 bool manualServoOverride = false;
 bool manualLampOverride = false;
 
@@ -141,73 +142,132 @@ float measureDistanceServo() {
   return (t * 0.034) / 2;
 }
 
+// ===================== FIXES APPLIED HERE =====================
+void initWiFi() {
+  Serial.println(F("Resetting ESP8266..."));
+  esp.println(F("AT+RST"));
+  delay(3000);
+  
+  // Clear out the bootloader garbage text from the serial buffer
+  while(esp.available()) { esp.read(); }
+  
+  esp.println(F("AT+CWMODE=1")); 
+  delay(500);
+  
+  esp.println(F("AT+CIPMUX=1")); 
+  delay(500);
+  
+  Serial.print(F("Connecting to WiFi: "));
+  Serial.println(WIFI_SSID);
+  
+  esp.print(F("AT+CWJAP=\""));
+  esp.print(WIFI_SSID);
+  esp.print(F("\",\""));
+  esp.print(WIFI_PASS);
+  esp.println(F("\""));
+  
+  // CRITICAL FIX: Give the ESP up to 15 seconds to finish connecting to your router
+  esp.setTimeout(15000); 
+  
+  if (esp.find("WIFI GOT IP")) {
+    Serial.println(F("WiFi Connected successfully!"));
+    delay(1000); 
+    
+    // Print the IP address to the monitor
+    esp.setTimeout(1000); // Reset timeout back to normal
+    esp.println(F("AT+CIFSR")); 
+    delay(500);
+    Serial.println(F("\n===== ESP8266 NETWORK INFO ====="));
+    while (esp.available()) {
+      char c = esp.read();
+      Serial.write(c); 
+    }
+    Serial.println(F("================================\n"));
+  } else {
+    Serial.println(F("WiFi Connection Failed or Timed Out. Check SSID/Password."));
+    esp.setTimeout(1000); // Reset timeout back to normal
+  }
+}
+
+void handshakeWithServer() {
+  Serial.print(F("Opening persistent TCP Connection to "));
+  Serial.print(SERVER_IP);
+  Serial.println(F(":5000..."));
+
+  // Give the TCP connection attempt up to 5 seconds to connect
+  esp.setTimeout(5000);
+
+  esp.print(F("AT+CIPSTART=0,\"TCP\",\""));
+  esp.print(SERVER_IP);
+  esp.println(F("\",5000"));
+  
+  if (esp.find("CONNECT")) {
+    Serial.println(F("TCP Handshake Successful!"));
+    
+    String handshakeMsg = "HELLO_FROM_IOT_BOARD_PLACEHOLDER\n";
+    
+    esp.print(F("AT+CIPSEND=0,"));
+    esp.println(handshakeMsg.length());
+    delay(200); 
+    esp.print(handshakeMsg);
+    
+    Serial.println(F("TCP connection 0 left open for continuous data streaming."));
+  } else {
+    Serial.println(F("TCP Connection Failed. Ensure your backend server is running and firewall is off."));
+  }
+  
+  esp.setTimeout(1000); // Reset timeout back to normal
+}
+
 // ===================== SETUP =====================
 void setup() {
   Serial.begin(9600);
-  esp.begin(115200); // If your ESP is set to 115200. If you changed ESP to 9600, change this.
+  
+  // NOTE: If you used 115200 in your test to get "OK", change this to 115200!
+  esp.begin(9600); 
 
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
-
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
   pinMode(bluePin, OUTPUT);
   setColor(0,0,0);
-
   pinMode(PUMP_PIN, OUTPUT);
   digitalWrite(PUMP_PIN, LOW);
-
   pinMode(LDR_DO_PIN, INPUT);
   pinMode(LDR_LED_PIN, OUTPUT);
   digitalWrite(LDR_LED_PIN, LOW);
-
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
 
   myServo.attach(SERVO_PIN);
   myServo.write(0);
-
   dht.begin();
 
-  // --- ESP WiFi Init (basic) ---
-  delay(2000);
-  esp.println("AT+RST");
-  delay(2000);
-  esp.println("AT+CWMODE=1"); // station mode
+  // Run network setup routines
+  initWiFi();
+  handshakeWithServer();
+
+  // Start incoming command listener on Port 80
+  esp.println(F("AT+CIPSERVER=1,80"));
   delay(2000);
 
-  // Connect to WiFi
-  esp.print("AT+CWJAP=\"");
-  esp.print(WIFI_SSID);
-  esp.print("\",\"");
-  esp.print(WIFI_PASS);
-  esp.println("\"");
-  delay(5000);
-
-  // Start TCP server on port 80
-  esp.println("AT+CIPMUX=1");
-  delay(1000);
-  esp.println("AT+CIPSERVER=1,80");
-  delay(2000);
-
-  Serial.println(F("System + WiFi Initialized"));
+  Serial.println(F("System fully initialized. Ready for automation."));
 }
 
 // ===================== LOOP =====================
 void loop() {
-  // --- Handle incoming ESP data (commands) as often as possible ---
   if (esp.available()) {
     String raw = esp.readStringUntil('\n');
     raw.trim();
     if (raw.length() > 0) {
-      Serial.print(F("ESP raw: "));
+      Serial.print(F("ESP raw incoming: "));
       Serial.println(raw);
 
-      // Simple command parsing: look for keywords
       if (raw.indexOf("SERVO_ON") >= 0) {
         myServo.write(90);
         manualServoOverride = true;
-        servoActive = false; // cancel auto motion while manual override active
+        servoActive = false; 
         Serial.println(F("Servo forced ON via WiFi"));
       }
       else if (raw.indexOf("SERVO_OFF") >= 0) {
@@ -225,31 +285,22 @@ void loop() {
         manualLampOverride = false;
         Serial.println(F("Lamp OFF via WiFi"));
       }
-      // Optional: add commands to request status
-      else if (raw.indexOf("STATUS") >= 0) {
-        Serial.println(F("STATUS REQUESTED"));
-        // You could respond via esp.println(...) if you parse +IPD responses; left as debug for now.
-      }
     }
   }
 
-  // --- Main periodic automation (runs every UPDATE_INTERVAL) ---
   if (millis() - lastUpdate >= UPDATE_INTERVAL) {
     lastUpdate = millis();
 
-    // --- LDR (only automatic if not manually overridden) ---
     if (!manualLampOverride) {
       digitalWrite(LDR_LED_PIN, digitalRead(LDR_DO_PIN));
     }
 
-    // --- RGB Ultrasonic ---
     distance = measureDistanceCmRGB();
     Serial.print(F("RGB Distance: "));
     if (distance < 0) Serial.println(F("No echo"));
     else Serial.println(distance);
     applyBandIfChanged(bandFromDistance(distance));
 
-    // --- Soil Moisture + Humidity/Temperature ---
     int moistureValue = medianOf5Moisture();
     Serial.print(F("Moisture: "));
     Serial.println(moistureValue);
@@ -276,7 +327,6 @@ void loop() {
       digitalWrite(PUMP_PIN, LOW);
     }
 
-    // --- Servo Ultrasonic (automatic only if not manually overridden) ---
     if (!manualServoOverride) {
       float distance_cm = measureDistanceServo();
       if (distance_cm > 0 && distance_cm < DETECTION_THRESHOLD) {

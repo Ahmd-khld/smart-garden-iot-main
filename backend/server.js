@@ -31,6 +31,7 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const gameRoutes = require('./routes/gameRoutes');
 const otpRoutes = require('./routes/otpRoutes');
+const hardwareRoutes = require('./routes/hardwareRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -193,6 +194,7 @@ app.use('/api/grc', grcRoutes);
 app.use('/api/game', gameRoutes);
 app.use('/api/promo', promoRoutes);
 app.use('/api/otp', otpRoutes);
+app.use('/api/hardware', hardwareRoutes);
 
 // TEMPORARY TEST TRIGGER FOR GRC DASHBOARD
 app.get('/api/admin/trigger-test-attack', async (req, res) => {

@@ -96,6 +96,7 @@ const AdminDashboard = () => {
     totalAlertsCount,
     setTotalAlertsCount,
     telemetryMatrix,
+    liveReadings,
   } = useTelemetry();
 
   const [alertPage, setAlertPage] = useState(1);
@@ -586,6 +587,15 @@ const AdminDashboard = () => {
     if (cleanId) {
       handleScanRequest(cleanId);
       setManualTicketId('');
+    }
+  };
+
+  const handleHardwareCommand = async (command) => {
+    try {
+      const res = await api.post('/hardware/control', { command });
+      showModal(res.data.message, 'Hardware Control', 'success');
+    } catch (err) {
+      showModal(err.response?.data?.message || 'Failed to control hardware.', 'Hardware Error', 'error');
     }
   };
 
@@ -4234,232 +4244,108 @@ const AdminDashboard = () => {
           )}
 
           {activeTab === 'hardware' && (
-            <div className="flex flex-col xl:flex-row gap-8 mb-10 animate-fade-in-up items-stretch">
-              {/* Gate QR Scanner */}
-              <div className="bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden flex flex-col w-full xl:w-1/3">
-                <div className="bg-smart-bg dark:bg-gray-900 px-6 sm:px-8 py-6 border-b border-smart-light/10 flex flex-col items-center justify-center gap-4">
-                  <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic shrink-0">
-                    <svg
-                      className="w-6 h-6 mr-3 text-smart-light"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
-                      ></path>
+            <div className="animate-fade-in">
+              {/* LIVE SENSOR DATA MATRIX */}
+              <div className="mb-10 bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden">
+                <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center">
+                  <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic select-none">
+                    <svg className="w-6 h-6 mr-3 text-smart-glow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path>
                     </svg>
-                    Gate QR Scanner
+                    Live Sensor Matrix
                   </h2>
-                  <div className="flex flex-row flex-wrap justify-center items-center gap-3">
-                    <button
-                      onClick={handleToggleCamera}
-                      className="px-3 py-1.5 bg-smart-bg dark:bg-gray-800 hover:bg-smart-light/20 text-smart-dark dark:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm flex justify-center items-center border border-smart-light/10"
-                    >
-                      <svg
-                        className="w-3 h-3 mr-1.5 text-smart-light"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        ></path>
-                      </svg>
-                      Switch Cam
-                    </button>
-                    <button
-                      onClick={handleUnlockScanner}
-                      className="px-3 py-1.5 bg-smart-bg dark:bg-gray-800 hover:bg-smart-light/20 text-smart-dark dark:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm flex justify-center items-center border border-smart-light/10"
-                    >
-                      <svg
-                        className="w-3 h-3 mr-1.5 text-smart-light"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
-                        ></path>
-                      </svg>
-                      Unlock
-                    </button>
-                    <div className="flex justify-center items-center space-x-2 bg-smart-light/10 dark:bg-smart-light/20 px-3 py-1.5 rounded-full border border-smart-light/20">
-                      <div className="w-2 h-2 bg-smart-light rounded-full animate-ping"></div>
-                      <span className="text-[10px] text-smart-dark dark:text-smart-glow font-black uppercase tracking-widest">
-                        Online
-                      </span>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-[10px] font-black text-smart-gray dark:text-gray-500 uppercase tracking-widest">
+                      Node IP: <span className="text-smart-dark dark:text-white">{liveReadings.ipAddress}</span>
+                    </span>
+                    <span className="text-[10px] font-black text-smart-gray dark:text-gray-500 uppercase tracking-widest">
+                      Last Sync: <span className="text-smart-dark dark:text-white">{liveReadings.lastUpdate || 'Waiting...'}</span>
+                    </span>
+                  </div>
+                </div>
+                <div className="p-8 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                  <div className="flex flex-col items-center p-4 bg-smart-bg dark:bg-gray-900 rounded-3xl border border-smart-light/10">
+                    <span className="text-[9px] font-black text-smart-gray dark:text-gray-500 uppercase tracking-widest mb-2">Moisture</span>
+                    <span className="text-2xl font-black text-smart-dark dark:text-white italic">{liveReadings.moisture}</span>
+                    <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full mt-2 overflow-hidden">
+                      <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${Math.min(100, (liveReadings.moisture / 1023) * 100)}%` }}></div>
                     </div>
+                  </div>
+                  <div className="flex flex-col items-center p-4 bg-smart-bg dark:bg-gray-900 rounded-3xl border border-smart-light/10">
+                    <span className="text-[9px] font-black text-smart-gray dark:text-gray-500 uppercase tracking-widest mb-2">Humidity</span>
+                    <span className="text-2xl font-black text-smart-dark dark:text-white italic">{liveReadings.humidity}%</span>
+                  </div>
+                  <div className="flex flex-col items-center p-4 bg-smart-bg dark:bg-gray-900 rounded-3xl border border-smart-light/10">
+                    <span className="text-[9px] font-black text-smart-gray dark:text-gray-500 uppercase tracking-widest mb-2">Temperature</span>
+                    <span className="text-2xl font-black text-smart-dark dark:text-white italic">{liveReadings.temperature}°C</span>
+                  </div>
+                  <div className="flex flex-col items-center p-4 bg-smart-bg dark:bg-gray-900 rounded-3xl border border-smart-light/10">
+                    <span className="text-[9px] font-black text-smart-gray dark:text-gray-500 uppercase tracking-widest mb-2">RGB Distance</span>
+                    <span className="text-2xl font-black text-smart-dark dark:text-white italic">{liveReadings.rgbDistance} cm</span>
+                  </div>
+                  <div className="flex flex-col items-center p-4 bg-smart-bg dark:bg-gray-900 rounded-3xl border border-smart-light/10">
+                    <span className="text-[9px] font-black text-smart-gray dark:text-gray-500 uppercase tracking-widest mb-2">Servo Distance</span>
+                    <span className="text-2xl font-black text-smart-dark dark:text-white italic">{liveReadings.servoDistance} cm</span>
                   </div>
                 </div>
 
-                <div className="flex-grow flex flex-col bg-smart-dark/5 dark:bg-black p-6 sm:p-10 justify-center items-center relative">
-                  {scanMessage && (
-                    <div
-                      className={`mb-8 p-6 rounded-2xl font-black text-center text-sm shadow-xl border-2 w-full mx-auto transform animate-fade-in ${scanMessage.type === 'success' ? 'bg-smart-light/20 border-smart-light text-smart-dark dark:text-smart-glow' : 'bg-red-50 border-red-500 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
-                    >
-                      {scanMessage.text}
+                {/* REMOTE ACTUATOR CONTROL */}
+                <div className="bg-smart-bg/30 dark:bg-gray-900/30 px-8 py-6 border-t border-smart-light/10">
+                  <h3 className="text-xs font-black text-smart-dark dark:text-white uppercase italic mb-6 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path>
+                    </svg>
+                    Remote Actuator Control
+                  </h3>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center bg-white dark:bg-gray-800 p-2 rounded-2xl border border-smart-light/10 shadow-sm">
+                      <span className="px-4 text-[10px] font-black text-smart-gray dark:text-gray-400 uppercase tracking-widest">Gate Servo</span>
+                      <button onClick={() => handleHardwareCommand('SERVO_ON')} className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Open</button>
+                      <button onClick={() => handleHardwareCommand('SERVO_OFF')} className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ml-2">Close</button>
                     </div>
-                  )}
-
-                  <div className="flex flex-col items-center justify-center p-6 bg-slate-800/50 rounded-xl border border-slate-700 w-full max-w-sm mx-auto gap-5 overflow-hidden shadow-2xl">
-                    {/* 1. Dynamic Status Indicator */}
-                    <div
-                      className={`flex items-center justify-center gap-2 text-sm font-bold tracking-wider whitespace-nowrap ${isCameraActive ? 'text-green-400' : 'text-red-400'}`}
-                    >
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                        ></path>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                        ></path>
-                      </svg>
-                      {isCameraActive ? 'OPTICAL SENSOR ONLINE' : 'OPTICAL SENSOR OFFLINE'}
+                    <div className="flex items-center bg-white dark:bg-gray-800 p-2 rounded-2xl border border-smart-light/10 shadow-sm">
+                      <span className="px-4 text-[10px] font-black text-smart-gray dark:text-gray-400 uppercase tracking-widest">System Lamp</span>
+                      <button onClick={() => handleHardwareCommand('LAMP_ON')} className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">ON</button>
+                      <button onClick={() => handleHardwareCommand('LAMP_OFF')} className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ml-2">OFF</button>
                     </div>
-
-                    {/* 2. Main Action Button */}
-                    <button
-                      onClick={handleToggleSensor}
-                      className={`w-full font-bold py-3 px-4 rounded-lg transition-all transform active:scale-95 flex items-center justify-center text-white shadow-lg ${isCameraActive ? 'bg-red-500 hover:bg-red-600 shadow-red-900/20' : 'bg-green-500 hover:bg-green-600 shadow-green-900/20'}`}
-                    >
-                      {isCameraActive ? 'HALT SENSOR LINK' : 'AUTHORIZE SENSOR LINK'}
-                    </button>
-
-                    {/* 3. Fallback Link */}
-                    <label className="text-sm text-slate-400 hover:text-white transition-colors cursor-pointer flex items-center gap-2">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <span>Scan an Image File</span>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={handleFileScan}
-                      />
-                    </label>
-                  </div>
-
-                  <div className="relative w-full max-w-md mx-auto mt-10">
-                    <style>{`
-                      #reader { border: none !important; }
-                      #reader video { 
-                        border-radius: 24px !important; 
-                        object-fit: cover !important;
-                        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
-                      }
-                      #reader img { display: none !important; }
-                      #reader__scan_region { border: none !important; }
-                    `}</style>
-                    <div
-                      id="reader"
-                      className="w-full bg-white dark:bg-gray-800 rounded-[30px] shadow-2xl border-4 border-smart-dark dark:border-smart-light/50 ring-8 ring-smart-bg dark:ring-gray-900 overflow-hidden"
-                    ></div>
-                    {isLockedUI && (
-                      <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-[30px]">
-                        <button
-                          onClick={handleNextScan}
-                          className="bg-blue-500 hover:bg-blue-600 text-white font-black py-4 px-10 rounded-2xl shadow-2xl transform transition hover:scale-105 active:scale-95 uppercase tracking-widest text-sm"
-                        >
-                          Next Scan
-                        </button>
+                    <div className="flex items-center bg-white dark:bg-gray-800 p-4 rounded-2xl border border-smart-light/10 shadow-sm ml-auto">
+                      <div className="flex flex-col items-end mr-4">
+                        <span className="text-[9px] font-black text-smart-gray dark:text-gray-500 uppercase tracking-widest">Pump Status</span>
+                        <span className={`text-[11px] font-black uppercase italic ${liveReadings.pumpStatus === 'ON' ? 'text-green-500' : 'text-red-500'}`}>{liveReadings.pumpStatus}</span>
                       </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-smart-bg dark:bg-gray-900 p-6 sm:p-8 border-t border-smart-light/10 mt-auto w-full">
-                  <form
-                    onSubmit={handleManualOverride}
-                    className="flex flex-col space-y-4 max-w-md mx-auto w-full"
-                  >
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={manualTicketId}
-                        onChange={(e) => setManualTicketId(e.target.value)}
-                        placeholder="ENTER TICKET IDENTIFIER..."
-                        className="w-full px-6 py-5 rounded-2xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition font-mono text-xs font-black tracking-widest"
-                      />
-                      <svg
-                        className="w-5 h-5 absolute right-6 top-1/2 -translate-y-1/2 text-smart-light/40"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01"
-                        ></path>
-                      </svg>
+                      <div className={`w-3 h-3 rounded-full ${liveReadings.pumpStatus === 'ON' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
                     </div>
-                    <button
-                      type="submit"
-                      className="w-full py-5 bg-smart-light hover:bg-smart-dark text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl hover:shadow-smart-light/20 active:scale-95"
-                    >
-                      Manual Entry Override
-                    </button>
-                  </form>
+                  </div>
                 </div>
               </div>
 
-              {/* Hardware Alerts Table */}
-              <div
-                id="hardware-alerts-panel"
-                className="bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 flex flex-col overflow-hidden transition-all duration-300 w-full xl:w-2/3"
-              >
-                <div className="bg-smart-bg dark:bg-gray-900 px-6 sm:px-8 py-6 border-b border-smart-light/10 flex flex-col lg:flex-row justify-between items-center gap-4">
-                  <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic select-none shrink-0 w-full lg:w-auto justify-center lg:justify-start">
-                    <svg
-                      className="w-6 h-6 mr-3 text-red-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M13 10V3L4 14h7v7l9-11h-7z"
-                      ></path>
-                    </svg>
-                    Hardware Alerts
-                  </h2>
-                  <div className="flex flex-row flex-wrap items-center justify-center lg:justify-end gap-3 w-full lg:w-auto text-smart-gray dark:text-gray-400">
-                    {isSuperAdmin && (
+              <div className="flex flex-col xl:flex-row gap-8 mb-10 items-stretch">
+                {/* Gate QR Scanner */}
+                <div className="bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden flex flex-col w-full xl:w-1/3">
+                  <div className="bg-smart-bg dark:bg-gray-900 px-6 sm:px-8 py-6 border-b border-smart-light/10 flex flex-col items-center justify-center gap-4">
+                    <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic shrink-0">
+                      <svg
+                        className="w-6 h-6 mr-3 text-smart-light"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+                        ></path>
+                      </svg>
+                      Gate QR Scanner
+                    </h2>
+                    <div className="flex flex-row flex-wrap justify-center items-center gap-3">
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleClearHardwareAlerts();
-                        }}
-                        className="hidden sm:flex items-center mr-4 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors border border-red-500/20"
-                        disabled={alerts.length === 0}
+                        onClick={handleToggleCamera}
+                        className="px-3 py-1.5 bg-smart-bg dark:bg-gray-800 hover:bg-smart-light/20 text-smart-dark dark:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm flex justify-center items-center border border-smart-light/10"
                       >
                         <svg
-                          className="w-3 h-3 mr-1.5"
+                          className="w-3 h-3 mr-1.5 text-smart-light"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -4468,159 +4354,346 @@ const AdminDashboard = () => {
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth="2"
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                           ></path>
                         </svg>
-                        Clear All
+                        Switch Cam
                       </button>
-                    )}
-                    <div className="flex items-center space-x-2 bg-smart-bg dark:bg-gray-800 px-4 py-1.5 rounded-full border border-smart-light/10 mr-4">
-                      <div className="w-2 h-2 bg-smart-light rounded-full animate-pulse"></div>
-                      <span className="text-[10px] text-smart-gray dark:text-gray-500 font-black uppercase tracking-widest hidden sm:inline">
-                        Real-time Stream
-                      </span>
+                      <button
+                        onClick={handleUnlockScanner}
+                        className="px-3 py-1.5 bg-smart-bg dark:bg-gray-800 hover:bg-smart-light/20 text-smart-dark dark:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm flex justify-center items-center border border-smart-light/10"
+                      >
+                        <svg
+                          className="w-3 h-3 mr-1.5 text-smart-light"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"
+                          ></path>
+                        </svg>
+                        Unlock
+                      </button>
+                      <div className="flex justify-center items-center space-x-2 bg-smart-light/10 dark:bg-smart-light/20 px-3 py-1.5 rounded-full border border-smart-light/20">
+                        <div className="w-2 h-2 bg-smart-light rounded-full animate-ping"></div>
+                        <span className="text-[10px] text-smart-dark dark:text-smart-glow font-black uppercase tracking-widest">
+                          Online
+                        </span>
+                      </div>
                     </div>
+                  </div>
+
+                  <div className="flex-grow flex flex-col bg-smart-dark/5 dark:bg-black p-6 sm:p-10 justify-center items-center relative">
+                    {scanMessage && (
+                      <div
+                        className={`mb-8 p-6 rounded-2xl font-black text-center text-sm shadow-xl border-2 w-full mx-auto transform animate-fade-in ${scanMessage.type === 'success' ? 'bg-smart-light/20 border-smart-light text-smart-dark dark:text-smart-glow' : 'bg-red-50 border-red-500 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
+                      >
+                        {scanMessage.text}
+                      </div>
+                    )}
+
+                    <div className="flex flex-col items-center justify-center p-6 bg-slate-800/50 rounded-xl border border-slate-700 w-full max-w-sm mx-auto gap-5 overflow-hidden shadow-2xl">
+                      <div
+                        className={`flex items-center justify-center gap-2 text-sm font-bold tracking-wider whitespace-nowrap ${isCameraActive ? 'text-green-400' : 'text-red-400'}`}
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                          ></path>
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                          ></path>
+                        </svg>
+                        {isCameraActive ? 'OPTICAL SENSOR ONLINE' : 'OPTICAL SENSOR OFFLINE'}
+                      </div>
+
+                      <button
+                        onClick={handleToggleSensor}
+                        className={`w-full font-bold py-3 px-4 rounded-lg transition-all transform active:scale-95 flex items-center justify-center text-white shadow-lg ${isCameraActive ? 'bg-red-500 hover:bg-red-600 shadow-red-900/20' : 'bg-green-500 hover:bg-green-600 shadow-green-900/20'}`}
+                      >
+                        {isCameraActive ? 'HALT SENSOR LINK' : 'AUTHORIZE SENSOR LINK'}
+                      </button>
+
+                      <label className="text-sm text-slate-400 hover:text-white transition-colors cursor-pointer flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span>Scan an Image File</span>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*"
+                          onChange={handleFileScan}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="relative w-full max-w-md mx-auto mt-10">
+                      <div
+                        id="reader"
+                        className="w-full bg-white dark:bg-gray-800 rounded-[30px] shadow-2xl border-4 border-smart-dark dark:border-smart-light/50 ring-8 ring-smart-bg dark:ring-gray-900 overflow-hidden"
+                      ></div>
+                      {isLockedUI && (
+                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm rounded-[30px]">
+                          <button
+                            onClick={handleNextScan}
+                            className="bg-blue-500 hover:bg-blue-600 text-white font-black py-4 px-10 rounded-2xl shadow-2xl transform transition hover:scale-105 active:scale-95 uppercase tracking-widest text-sm"
+                          >
+                            Next Scan
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-smart-bg dark:bg-gray-900 p-6 sm:p-8 border-t border-smart-light/10 mt-auto w-full">
+                    <form
+                      onSubmit={handleManualOverride}
+                      className="flex flex-col space-y-4 max-w-md mx-auto w-full"
+                    >
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={manualTicketId}
+                          onChange={(e) => setManualTicketId(e.target.value)}
+                          placeholder="ENTER TICKET IDENTIFIER..."
+                          className="w-full px-6 py-5 rounded-2xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white focus:ring-4 focus:ring-smart-light/20 focus:border-smart-light outline-none transition font-mono text-xs font-black tracking-widest"
+                        />
+                        <svg
+                          className="w-5 h-5 absolute right-6 top-1/2 -translate-y-1/2 text-smart-light/40"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2"
+                            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01"
+                          ></path>
+                        </svg>
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full py-5 bg-smart-light hover:bg-smart-dark text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl hover:shadow-smart-light/20 active:scale-95"
+                      >
+                        Manual Entry Override
+                      </button>
+                    </form>
                   </div>
                 </div>
 
-                {isHardwareAlertsExpanded && (
-                  <>
-                    <div className="bg-smart-bg/30 dark:bg-gray-900/30 px-8 py-4 border-b border-smart-light/10 flex justify-between items-center">
-                      <span className="text-xs font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest">
-                        {filteredAlerts.length} Alerts
-                      </span>
-                      <select
-                        value={alertFilterType}
-                        onChange={(e) => {
-                          setAlertFilterType(e.target.value);
-                          fetchDashboardAlerts(e.target.value);
-                        }}
-                        className="px-4 py-2 rounded-xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white focus:ring-2 focus:ring-smart-light/50 outline-none transition font-mono text-[10px] font-black tracking-widest cursor-pointer"
+                {/* Hardware Alerts Table */}
+                <div
+                  id="hardware-alerts-panel"
+                  className="bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 flex flex-col overflow-hidden transition-all duration-300 w-full xl:w-2/3"
+                >
+                  <div className="bg-smart-bg dark:bg-gray-900 px-6 sm:px-8 py-6 border-b border-smart-light/10 flex flex-col lg:flex-row justify-between items-center gap-4">
+                    <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic select-none shrink-0 w-full lg:w-auto justify-center lg:justify-start">
+                      <svg
+                        className="w-6 h-6 mr-3 text-red-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
                       >
-                        <option value="all">ALL ALERTS</option>
-                        <option value="warning">WARNINGS</option>
-                        <option value="info">INFO</option>
-                        <option value="action">ACTIONS</option>
-                        <option value="success">SUCCESS</option>
-                        <option value="error">ERRORS</option>
-                      </select>
-                    </div>
-
-                    <div className="flex-grow overflow-y-auto overflow-x-auto h-[450px] custom-scrollbar">
-                      <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-0 bg-smart-bg dark:bg-gray-900 z-10">
-                          <tr className="border-b border-smart-light/10 text-smart-gray dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">
-                            <th className="px-4 py-3 pl-6 whitespace-nowrap text-left w-1/4">
-                              Date & Time
-                            </th>
-                            <th className="px-4 py-3 whitespace-nowrap text-center w-[100px]">
-                              Type
-                            </th>
-                            <th className="px-4 py-3 w-full text-left">Alert Message</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
-                          {Array.isArray(filteredAlerts) && filteredAlerts.map((alert) => (
-                            <tr
-                              key={alert._id || alert.id}
-                              className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
-                            >
-                              <td className="px-4 py-3 pl-6 whitespace-nowrap align-top text-left w-1/4">
-                                <div className="text-sm font-bold text-smart-dark dark:text-gray-300">
-                                  {alert.timeString || alert.time}
-                                </div>
-                                <div className="text-xs font-bold text-smart-gray dark:text-gray-500 uppercase mt-0.5">
-                                  {new Date(alert.createdAt).toLocaleDateString()}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 whitespace-nowrap align-top text-center w-[100px]">
-                                {alert.type === 'warning' && (
-                                  <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 text-[9px] font-black px-2.5 py-1.5 rounded-md uppercase tracking-wider border border-yellow-200 dark:border-yellow-800 inline-block w-[72px] text-center">
-                                    Warning
-                                  </span>
-                                )}
-                                {alert.type === 'info' && (
-                                  <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 text-[9px] font-black px-2.5 py-1.5 rounded-md uppercase tracking-wider border border-blue-200 dark:border-blue-800 inline-block w-[72px] text-center">
-                                    Info
-                                  </span>
-                                )}
-                                {alert.type === 'action' && (
-                                  <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[9px] font-black px-2.5 py-1.5 rounded-md uppercase tracking-wider border border-smart-light/20 inline-block w-[72px] text-center">
-                                    Action
-                                  </span>
-                                )}
-                                {alert.type === 'success' && (
-                                  <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-[9px] font-black px-2.5 py-1.5 rounded-md uppercase tracking-wider border border-green-200 dark:border-green-800 inline-block w-[72px] text-center">
-                                    Success
-                                  </span>
-                                )}
-                                {alert.type === 'error' && (
-                                  <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 text-[9px] font-black px-2.5 py-1.5 rounded-md uppercase tracking-wider border border-red-200 dark:border-red-800 inline-block w-[72px] text-center">
-                                    Error
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-smart-dark dark:text-gray-200 font-medium text-sm leading-relaxed break-words align-top text-left w-full">
-                                {alert.message}
-                              </td>
-                            </tr>
-                          ))}
-                          {(!filteredAlerts || filteredAlerts.length === 0) && (
-                            <tr>
-                              <td
-                                colSpan="3"
-                                className="p-8 text-center text-smart-gray dark:text-gray-500 font-black uppercase tracking-widest text-[10px]"
-                              >
-                                No hardware alerts detected. Waiting for telemetry...
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div className="mt-auto flex flex-col w-full">
-                      {(totalAlertPages > 1 || filteredAlerts.length === 0) && !isLoadingAlerts && (
-                        <div className="bg-smart-bg/30 dark:bg-gray-900/30 px-6 sm:px-8 py-4 border-t border-smart-light/10 flex flex-col sm:flex-row justify-between items-center gap-4">
-                          <span className="text-[10px] font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest text-center sm:text-left w-full sm:w-auto shrink-0">
-                            Showing {filteredAlerts.length === 0 ? 0 : (alertPage - 1) * 10 + 1} to{' '}
-                            {Math.min(alertPage * 10, totalAlertsCount)} of {totalAlertsCount}
-                          </span>
-                          <div className="flex space-x-2 items-center justify-center sm:justify-end w-full sm:w-auto shrink-0">
-                            <button
-                              onClick={() => fetchAlertsPage(Math.max(1, alertPage - 1))}
-                              disabled={alertPage <= 1}
-                              className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-smart-light/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-smart-light/10 shadow-sm"
-                            >
-                              Prev
-                            </button>
-                            <span className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-smart-dark dark:text-white flex items-center shrink-0">
-                              Page {filteredAlerts.length === 0 ? 0 : alertPage} of {filteredAlerts.length === 0 ? 0 : totalAlertPages}
-                            </span>
-                            <button
-                              onClick={() =>
-                                fetchAlertsPage(Math.min(totalAlertPages, alertPage + 1))
-                              }
-                              disabled={alertPage >= totalAlertPages || filteredAlerts.length === 0}
-                              className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-smart-light/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-smart-light/10 shadow-sm"
-                            >
-                              Next
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="bg-smart-bg dark:bg-gray-900 p-6 border-t border-smart-light/10 flex justify-center items-center">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2"
+                          d="M13 10V3L4 14h7v7l9-11h-7z"
+                        ></path>
+                      </svg>
+                      Hardware Alerts
+                    </h2>
+                    <div className="flex flex-row flex-wrap items-center justify-center lg:justify-end gap-3 w-full lg:w-auto text-smart-gray dark:text-gray-400">
+                      {isSuperAdmin && (
                         <button
-                          onClick={() => navigate('/admin/telemetry')}
-                          className="bg-green-600 hover:bg-green-700 text-white font-black text-[11px] py-3 px-8 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-green-900/20"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleClearHardwareAlerts();
+                          }}
+                          className="hidden sm:flex items-center mr-4 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors border border-red-500/20"
+                          disabled={alerts.length === 0}
                         >
-                          View Live Telemetry
+                          <svg
+                            className="w-3 h-3 mr-1.5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth="2"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            ></path>
+                          </svg>
+                          Clear All
                         </button>
+                      )}
+                      <div className="flex items-center space-x-2 bg-smart-bg dark:bg-gray-800 px-4 py-1.5 rounded-full border border-smart-light/10 mr-4">
+                        <div className="w-2 h-2 bg-smart-light rounded-full animate-pulse"></div>
+                        <span className="text-[10px] text-smart-gray dark:text-gray-500 font-black uppercase tracking-widest hidden sm:inline">
+                          Real-time Stream
+                        </span>
                       </div>
                     </div>
-                  </>
-                )}
+                  </div>
+
+                  {isHardwareAlertsExpanded && (
+                    <div className="flex flex-col flex-grow">
+                      <div className="bg-smart-bg/30 dark:bg-gray-900/30 px-8 py-4 border-b border-smart-light/10 flex justify-between items-center">
+                        <span className="text-xs font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest">
+                          {filteredAlerts.length} Alerts
+                        </span>
+                        <select
+                          value={alertFilterType}
+                          onChange={(e) => {
+                            setAlertFilterType(e.target.value);
+                            fetchDashboardAlerts(e.target.value);
+                          }}
+                          className="px-4 py-2 rounded-xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white focus:ring-2 focus:ring-smart-light/50 outline-none transition font-mono text-[10px] font-black tracking-widest cursor-pointer"
+                        >
+                          <option value="all">ALL ALERTS</option>
+                          <option value="warning">WARNINGS</option>
+                          <option value="info">INFO</option>
+                          <option value="action">ACTIONS</option>
+                          <option value="success">SUCCESS</option>
+                          <option value="error">ERRORS</option>
+                        </select>
+                      </div>
+
+                      <div className="flex-grow overflow-y-auto overflow-x-auto h-[450px] custom-scrollbar">
+                        <table className="w-full text-left border-collapse">
+                          <thead className="sticky top-0 bg-smart-bg dark:bg-gray-900 z-10">
+                            <tr className="border-b border-smart-light/10 text-smart-gray dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                              <th className="px-4 py-3 pl-6 whitespace-nowrap text-left w-1/4">
+                                Date & Time
+                              </th>
+                              <th className="px-4 py-3 whitespace-nowrap text-center w-[100px]">
+                                Type
+                              </th>
+                              <th className="px-4 py-3 w-full text-left">Alert Message</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
+                            {Array.isArray(filteredAlerts) && filteredAlerts.map((alert) => (
+                              <tr
+                                key={alert._id || alert.id}
+                                className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors"
+                              >
+                                <td className="px-4 py-3 pl-6 whitespace-nowrap align-top text-left w-1/4">
+                                  <div className="text-sm font-bold text-smart-dark dark:text-gray-300">
+                                    {alert.timeString || alert.time}
+                                  </div>
+                                  <div className="text-xs font-bold text-smart-gray dark:text-gray-500 uppercase mt-0.5">
+                                    {new Date(alert.createdAt).toLocaleDateString()}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 whitespace-nowrap align-top text-center w-[100px]">
+                                  {alert.type === 'warning' && (
+                                    <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 text-[9px] font-black px-2.5 py-1.5 rounded-md uppercase tracking-wider border border-yellow-200 dark:border-yellow-800 inline-block w-[72px] text-center">
+                                      Warning
+                                    </span>
+                                  )}
+                                  {alert.type === 'info' && (
+                                    <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 text-[9px] font-black px-2.5 py-1.5 rounded-md uppercase tracking-wider border border-blue-200 dark:border-blue-800 inline-block w-[72px] text-center">
+                                      Info
+                                    </span>
+                                  )}
+                                  {alert.type === 'action' && (
+                                    <span className="bg-smart-light/10 dark:bg-smart-light/20 text-smart-dark dark:text-smart-glow text-[9px] font-black px-2.5 py-1.5 rounded-md uppercase tracking-wider border border-smart-light/20 inline-block w-[72px] text-center">
+                                      Action
+                                    </span>
+                                  )}
+                                  {alert.type === 'success' && (
+                                    <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-[9px] font-black px-2.5 py-1.5 rounded-md uppercase tracking-wider border border-green-200 dark:border-green-800 inline-block w-[72px] text-center">
+                                      Success
+                                    </span>
+                                  )}
+                                  {alert.type === 'error' && (
+                                    <span className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 text-[9px] font-black px-2.5 py-1.5 rounded-md uppercase tracking-wider border border-red-200 dark:border-red-800 inline-block w-[72px] text-center">
+                                      Error
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-smart-dark dark:text-gray-200 font-medium text-sm leading-relaxed break-words align-top text-left w-full">
+                                  {alert.message}
+                                </td>
+                              </tr>
+                            ))}
+                            {(!filteredAlerts || filteredAlerts.length === 0) && (
+                              <tr>
+                                <td
+                                  colSpan="3"
+                                  className="p-8 text-center text-smart-gray dark:text-gray-500 font-black uppercase tracking-widest text-[10px]"
+                                >
+                                  No hardware alerts detected. Waiting for telemetry...
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="mt-auto flex flex-col w-full">
+                        {(totalAlertPages > 1 || filteredAlerts.length === 0) && !isLoadingAlerts && (
+                          <div className="bg-smart-bg/30 dark:bg-gray-900/30 px-6 sm:px-8 py-4 border-t border-smart-light/10 flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <span className="text-[10px] font-bold text-smart-gray dark:text-gray-400 uppercase tracking-widest text-center sm:text-left w-full sm:w-auto shrink-0">
+                              Showing {filteredAlerts.length === 0 ? 0 : (alertPage - 1) * 10 + 1} to{' '}
+                              {Math.min(alertPage * 10, totalAlertsCount)} of {totalAlertsCount}
+                            </span>
+                            <div className="flex space-x-2 items-center justify-center sm:justify-end w-full sm:w-auto shrink-0">
+                              <button
+                                onClick={() => fetchAlertsPage(Math.max(1, alertPage - 1))}
+                                disabled={alertPage <= 1}
+                                className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-smart-light/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-smart-light/10 shadow-sm"
+                              >
+                                Prev
+                              </button>
+                              <span className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-smart-dark dark:text-white flex items-center shrink-0">
+                                Page {filteredAlerts.length === 0 ? 0 : alertPage} of {filteredAlerts.length === 0 ? 0 : totalAlertPages}
+                              </span>
+                              <button
+                                onClick={() =>
+                                  fetchAlertsPage(Math.min(totalAlertPages, alertPage + 1))
+                                }
+                                disabled={alertPage >= totalAlertPages || filteredAlerts.length === 0}
+                                className="px-4 py-2 bg-white dark:bg-gray-800 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors border border-smart-light/20 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-smart-light/10 shadow-sm"
+                              >
+                                Next
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="bg-smart-bg dark:bg-gray-900 p-6 border-t border-smart-light/10 flex justify-center items-center">
+                          <button
+                            onClick={() => navigate('/admin/telemetry')}
+                            className="bg-green-600 hover:bg-green-700 text-white font-black text-[11px] py-3 px-8 rounded-xl transition-all uppercase tracking-widest shadow-lg shadow-green-900/20"
+                          >
+                            View Live Telemetry
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

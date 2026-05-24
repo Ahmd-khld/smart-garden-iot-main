@@ -13,6 +13,18 @@ const systemMapping = {
 export const TelemetryProvider = ({ children }) => {
   const [alerts, setAlerts] = useState([]);
   const [totalAlertsCount, setTotalAlertsCount] = useState(0);
+  const [liveReadings, setLiveReadings] = useState({
+    moisture: 0,
+    humidity: 0,
+    temperature: 0,
+    rgbDistance: 0,
+    servoDistance: 0,
+    ldrStatus: 'OFF',
+    pumpStatus: 'OFF',
+    servoStatus: 'CLOSED',
+    ipAddress: 'N/A',
+    lastUpdate: null
+  });
   const [telemetryMatrix, setTelemetryMatrix] = useState([
     { id: 1, system: 'Ambient Lighting', error: 0, warning: 0, success: 12, info: 2, action: 0 },
     { id: 2, system: 'Automated Gate', error: 1, warning: 0, success: 45, info: 4, action: 0 },
@@ -74,7 +86,21 @@ export const TelemetryProvider = ({ children }) => {
     };
 
     socket.on('hardwareAlert', onHardwareAlert);
-    return () => socket.off('hardwareAlert', onHardwareAlert);
+
+    const onLiveTelemetry = (data) => {
+      setLiveReadings((prev) => ({
+        ...prev,
+        ...data,
+        lastUpdate: new Date().toLocaleTimeString()
+      }));
+    };
+
+    socket.on('liveTelemetry', onLiveTelemetry);
+
+    return () => {
+      socket.off('hardwareAlert', onHardwareAlert);
+      socket.off('liveTelemetry', onLiveTelemetry);
+    };
   }, []);
 
   // --- Live Demo Mode Simulation ---
@@ -116,7 +142,8 @@ export const TelemetryProvider = ({ children }) => {
       totalAlertsCount, 
       setTotalAlertsCount,
       telemetryMatrix, 
-      setTelemetryMatrix 
+      setTelemetryMatrix,
+      liveReadings
     }}>
       {children}
     </TelemetryContext.Provider>
