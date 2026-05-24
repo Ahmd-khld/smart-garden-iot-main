@@ -1,14 +1,49 @@
 {
-  "name": "smart-garden-iot",
+  "name": "smart-park-unified",
   "version": "1.0.0",
-  "description": "Smart Garden IoT System",
+  "description": "Unified Next.js Smart Park System",
+  "main": "server.js",
   "scripts": {
-    "build": "npm run build-frontend",
-    "build-frontend": "cd frontend && npm install && npm run build",
-    "start": "node backend/server.js",
-    "dev-backend": "cd backend && npm run dev",
-    "dev-frontend": "cd frontend && npm run dev"
+    "dev": "nodemon server.js",
+    "start": "NODE_ENV=production node server.js",
+    "build": "next build"
   },
-  "author": "",
-  "license": "ISC"
+  "dependencies": {
+    "axios": "^1.16.1",
+    "bcrypt": "^6.0.0",
+    "cookie": "^1.1.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^8.5.2",
+    "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.358.0",
+    "mongoose": "^9.6.1",
+    "next": "latest",
+    "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.7",
+    "qrcode": "^1.5.4",
+    "qrcode.react": "^4.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "styled-components": "^6.4.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "autoprefixer": "^10.4.19",
+    "eslint": "latest",
+    "eslint-config-next": "latest",
+    "nodemon": "^3.1.14",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.4.5"
+  }
 }

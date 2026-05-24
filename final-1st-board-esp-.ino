@@ -328,39 +328,49 @@ void setup() {
 // ===================== LOOP =====================
 void loop() {
   if (esp.available()) {
-    String raw = esp.readStringUntil('\n');
-    raw.trim();
-    if (raw.length() > 0) {
-      Serial.print(F("ESP raw incoming: "));
-      Serial.println(raw);
+    // Robust parsing for +IPD server data
+    if (esp.find("+IPD,")) {
+      int linkId = esp.parseInt(); // Get connection ID
+      if (esp.find(":")) {
+        String cmd = esp.readStringUntil('\n');
+        cmd.trim();
+        Serial.print(F("Remote Command Received [Link "));
+        Serial.print(linkId);
+        Serial.print(F("]: "));
+        Serial.println(cmd);
 
-      if (raw.indexOf("SERVO_ON") >= 0) {
-        myServo.write(90);
-        servoPos = 90;
-        manualServoOverride = true;
-        servoActive = false; 
-        Serial.println(F("Servo MANUALLY OPEN"));
-      }
-      else if (raw.indexOf("SERVO_OFF") >= 0) {
-        myServo.write(0);
-        servoPos = 0;
-        manualServoOverride = true;
-        servoActive = false;
-        Serial.println(F("Servo MANUALLY LOCKED (CLOSED)"));
-      }
-      else if (raw.indexOf("SERVO_AUTO") >= 0) {
-        manualServoOverride = false;
-        Serial.println(F("Servo returned to AUTO mode"));
-      }
-      else if (raw.indexOf("LAMP_ON") >= 0) {
-        digitalWrite(LDR_LED_PIN, HIGH);
-        manualLampOverride = true;
-        Serial.println(F("Lamp ON via WiFi"));
-      }
-      else if (raw.indexOf("LAMP_OFF") >= 0) {
-        digitalWrite(LDR_LED_PIN, LOW);
-        manualLampOverride = false;
-        Serial.println(F("Lamp OFF via WiFi"));
+        if (cmd.indexOf("SERVO_ON") >= 0) {
+          myServo.write(90);
+          servoPos = 90;
+          manualServoOverride = true;
+          servoActive = false; 
+          Serial.println(F(">> Servo OPENED via Remote"));
+        }
+        else if (cmd.indexOf("SERVO_OFF") >= 0) {
+          myServo.write(0);
+          servoPos = 0;
+          manualServoOverride = true;
+          servoActive = false;
+          Serial.println(F(">> Servo CLOSED via Remote"));
+        }
+        else if (cmd.indexOf("SERVO_AUTO") >= 0) {
+          manualServoOverride = false;
+          Serial.println(F(">> Servo returned to AUTO mode"));
+        }
+        else if (cmd.indexOf("LAMP_ON") >= 0) {
+          digitalWrite(LDR_LED_PIN, HIGH);
+          manualLampOverride = true;
+          Serial.println(F(">> Lamp ON via Remote"));
+        }
+        else if (cmd.indexOf("LAMP_OFF") >= 0) {
+          digitalWrite(LDR_LED_PIN, LOW);
+          manualLampOverride = false;
+          Serial.println(F(">> Lamp OFF via Remote"));
+        }
+        
+        // Always close the connection after processing the command to free the mux
+        esp.print(F("AT+CIPCLOSE="));
+        esp.println(linkId);
       }
     }
   }
