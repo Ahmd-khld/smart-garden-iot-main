@@ -17,6 +17,7 @@ import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyEmail from './pages/VerifyEmail';
 import GamePage from './pages/GamePage';
+import CloudBackground from './components/CloudBackground';
 import { Navigate } from 'react-router-dom';
 import { socket } from './socket';
 import { TelemetryProvider } from './context/TelemetryContext';
@@ -96,92 +97,95 @@ function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <TelemetryProvider>
-        <div className="min-h-screen bg-smart-bg dark:bg-gray-900 text-smart-gray dark:text-gray-100 font-sans flex flex-col transition-colors duration-500">
-          <Navbar darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
-          <main className="flex-grow w-full flex flex-col">
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route
-                path="/book"
-                element={
-                  <PrivateRoute>
-                    <BookingPage />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/payment"
-                element={
-                  <PrivateRoute>
-                    <Payment />
-                  </PrivateRoute>
-                }
-              />
-              <Route path="/about" element={<About />} />
-              <Route path="/map" element={<ParkMap />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
-              <Route path="/reset-password/:token" element={<ResetPassword />} />
-              <Route
-                path="/admin/dashboard"
-                element={
-                  <AdminRoute>
-                    <AdminDashboard />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin/alerts"
-                element={
-                  <AdminRoute>
-                    <AdminHardwareAlerts />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin/users/:userId/tickets"
-                element={
-                  <AdminRoute>
-                    <AdminUserTickets />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin/telemetry"
-                element={
-                  <AdminRoute>
-                    <AdminTelemetry socket={socket} />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/admin/grc"
-                element={
-                  <AdminRoute>
-                    <AdminGRC />
-                  </AdminRoute>
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <PrivateRoute>
-                    <Profile />
-                  </PrivateRoute>
-                }
-              />
-              <Route
-                path="/rewards"
-                element={
-                  <PrivateRoute>
-                    <GamePage />
-                  </PrivateRoute>
-                }
-              />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </main>
+        <div className="min-h-screen bg-smart-bg dark:bg-gray-900 text-smart-gray dark:text-gray-100 font-sans flex flex-col transition-colors duration-500 relative">
+          <CloudBackground />
+          <div className="relative z-10 flex flex-col min-h-screen">
+            <Navbar darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
+            <main className="flex-grow w-full flex flex-col">
+              <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route
+                  path="/book"
+                  element={
+                    <PrivateRoute>
+                      <BookingPage />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/payment"
+                  element={
+                    <PrivateRoute>
+                      <Payment />
+                    </PrivateRoute>
+                  }
+                />
+                <Route path="/about" element={<About />} />
+                <Route path="/map" element={<ParkMap />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/reset-password/:token" element={<ResetPassword />} />
+                <Route
+                  path="/admin/dashboard"
+                  element={
+                    <AdminRoute>
+                      <AdminDashboard />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/alerts"
+                  element={
+                    <AdminRoute>
+                      <AdminHardwareAlerts />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/users/:userId/tickets"
+                  element={
+                    <AdminRoute>
+                      <AdminUserTickets />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/telemetry"
+                  element={
+                    <AdminRoute>
+                      <AdminTelemetry socket={socket} />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/grc"
+                  element={
+                    <AdminRoute>
+                      <AdminGRC />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/profile"
+                  element={
+                    <PrivateRoute>
+                      <Profile />
+                    </PrivateRoute>
+                  }
+                />
+                <Route
+                  path="/rewards"
+                  element={
+                    <PrivateRoute>
+                      <GamePage />
+                    </PrivateRoute>
+                  }
+                />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </main>
+          </div>
         </div>
       </TelemetryProvider>
     </Router>

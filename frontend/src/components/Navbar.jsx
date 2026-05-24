@@ -62,12 +62,12 @@ const Navbar = ({ darkMode, toggleDarkMode }) => {
         {/* Logo */}
         <Link
           to="/"
-          className="hover:opacity-90 transition transform shrink-0 z-10"
+          className="hover:opacity-90 transition transform shrink-0 z-20 -my-4 md:-my-10"
         >
           <img
             src={logo}
             alt="Smart Garden Logo"
-            className="h-10 md:h-20 w-auto object-contain drop-shadow-xl"
+            className="h-24 md:h-44 w-auto object-contain drop-shadow-2xl"
           />
         </Link>
 

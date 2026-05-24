@@ -39,11 +39,35 @@ body {
   scrollbar-color: #475569 transparent;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes drift {
+  from { transform: translate3d(-400px, 0, 0); }
+  to { transform: translate3d(calc(100vw + 400px), 0, 0); }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+.animate-drift {
+  animation: drift linear infinite;
+  will-change: transform;
+}
+
+/* Enable background visibility globally for dark mode */
+.dark body {
+  background-color: #020617 !important;
+}
+
+.dark #root,
+.dark .min-h-screen, 
+.dark [class*="bg-black"]:not(body), 
+.dark [class*="bg-gray-900"]:not(body),
+.dark [class*="bg-smart-bg"]:not(body) {
+  background-color: transparent !important;
+}
+
+/* Semi-transparent protective layer for readability */
+.dark #root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.4);
+  pointer-events: none;
+  z-index: 1;
 }
