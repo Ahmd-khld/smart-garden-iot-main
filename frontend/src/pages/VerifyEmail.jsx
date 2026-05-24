@@ -66,7 +66,7 @@ const VerifyEmail = () => {
           localStorage.setItem('adminEmail', storedEmail);
           navigate('/admin/dashboard', { replace: true });
         } else {
-          navigate('/', { replace: true });
+          navigate('/book', { replace: true });
         }
       }
     } catch (err) {

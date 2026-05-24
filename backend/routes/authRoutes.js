@@ -4,7 +4,7 @@ const OTP = require('../models/OTP');
 const jwt = require('jsonwebtoken');
 const { sendEmail } = require('../utils/emailService');
 const validateRequest = require('../middleware/validateRequest');
-const { loginValidationSchema } = require('../validators/schemas');
+const { loginValidationSchema, registerValidationSchema } = require('../validators/schemas');
 const { authLimiter } = require('../middleware/rateLimiters');
 
 const router = express.Router();
@@ -22,7 +22,7 @@ const generateOTP = () => {
 // @desc    Register a new user
 // @route   POST /api/register
 // @access  Public
-router.post('/register', async (req, res) => {
+router.post('/register', validateRequest(registerValidationSchema), async (req, res) => {
   try {
     const { name, email, phone, password, age, role, hasDisability } = req.body;
 

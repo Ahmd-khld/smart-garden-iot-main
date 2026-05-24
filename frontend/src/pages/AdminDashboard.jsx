@@ -3869,7 +3869,8 @@ const AdminDashboard = () => {
                     <div className="flex justify-end pt-2">
                       <button
                         type="submit"
-                        className="px-8 py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl font-black uppercase tracking-widest text-[11px] shadow-lg transition-all transform hover:-translate-y-0.5"
+                        disabled={!newAdminName.trim() || !newAdminEmail.trim() || !newAdminPassword.trim() || !newAdminIp.trim()}
+                        className="px-8 py-3 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:-translate-y-0 text-white rounded-xl font-black uppercase tracking-widest text-[11px] shadow-lg transition-all transform hover:-translate-y-0.5"
                       >
                         Provision Sub-Admin
                       </button>

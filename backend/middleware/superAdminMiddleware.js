@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const AdminAuditLog = require('../models/AdminAuditLog');
+const grcService = require('../utils/grcService');
 
 // Simple middleware to protect admin routes
 const requireAdmin = async (req, res, next) => {
@@ -73,6 +74,7 @@ const requireSuperAdmin = async (req, res, next) => {
           });
           const io = req.app.get('io');
           if (io) io.emit('auditLogUpdate', log);
+          grcService.triggerGRCUpdate();
         } catch (err) {
           console.error('Audit Log Error:', err);
         }

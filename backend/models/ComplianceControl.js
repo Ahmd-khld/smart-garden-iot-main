@@ -10,7 +10,7 @@ const complianceControlSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    name: {
+    title: {
       type: String,
       required: true,
     },
@@ -18,6 +18,12 @@ const complianceControlSchema = new mongoose.Schema(
       type: String,
       enum: ['implemented', 'partial', 'not_implemented'],
       default: 'not_implemented',
+    },
+    default_status: {
+      type: String,
+    },
+    default_evidence: {
+      type: String,
     },
     description: {
       type: String,

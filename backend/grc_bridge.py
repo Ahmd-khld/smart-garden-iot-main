@@ -10,7 +10,7 @@ if script_dir not in sys.path:
 
 try:
     from risk_engine import derive_risks
-    from compliance import posture, sync_catalog
+    from compliance import posture, sync_catalog, heuristic_adherence_scan
     from database.models import list_risks
 except ImportError as e:
     print(json.dumps({"error": f"Import Error: {str(e)}", "path": sys.path}))
@@ -20,7 +20,15 @@ def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
     if isinstance(obj, datetime):
         return obj.isoformat()
-    raise TypeError ("Type %s not serializable" % type(obj))
+    # Handle MongoDB ObjectId
+    try:
+        from bson import ObjectId
+        if isinstance(obj, ObjectId):
+            return str(obj)
+    except ImportError:
+        pass
+    # Fallback to string representation for anything else
+    return str(obj)
 
 def main():
     try:
@@ -57,12 +65,16 @@ def main():
         implemented = [c for c in compliance_data if str(c.get('status', c.get('default_status', ''))).lower() == 'implemented']
         overall_pct = int((len(implemented) / len(compliance_data)) * 100) if compliance_data else 0
 
+        # Real Heuristic Scan for Adherence
+        adherence_results = heuristic_adherence_scan()
+
         final_output = {
             "timestamp": datetime.now().isoformat(),
             "risks_summary": formatted_risks,
             "risk_register": risk_register,
             "compliance": compliance_data,
-            "overall_compliance_pct": overall_pct
+            "overall_compliance_pct": overall_pct,
+            "framework_adherence": adherence_results
         }
 
         # Output to stdout for Node.js to capture

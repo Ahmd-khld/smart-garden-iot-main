@@ -1,6 +1,20 @@
 import React from 'react';
 import styled from 'styled-components';
 
+const calculateStrength = (pwd) => {
+  if (!pwd) return '';
+  const hasLetters = /[a-zA-Z]/.test(pwd);
+  const hasNumbers = /[0-9]/.test(pwd);
+  const hasSpecial = /[^a-zA-Z0-9]/.test(pwd);
+  const length = pwd.length;
+
+  if (length >= 8 && hasLetters && hasNumbers) {
+    if (length >= 10 && hasSpecial) return 'Strong';
+    return 'Medium';
+  }
+  return 'Weak';
+};
+
 const MonkeyForm = ({
   email,
   setEmail,
@@ -21,14 +35,13 @@ const MonkeyForm = ({
   error,
   setShowForgotModal,
 }) => {
+  const strength = calculateStrength(password);
+  const isSubmitDisabled = isLoading || (!isLogin && password && strength === 'Weak');
+
   return (
     <StyledWrapper>
       <div className="card shadow-2xl">
         <input className="blind-check" type="checkbox" id="blind-input" name="blindcheck" hidden />
-        <label htmlFor="blind-input" className="blind_input">
-          <span className="hide">Hide</span>
-          <span className="show">Show</span>
-        </label>
         <form className="form" onSubmit={onLogin}>
           <div className="title">{isLogin ? 'Visitor Login' : 'Create Account'}</div>
 
@@ -125,8 +138,8 @@ const MonkeyForm = ({
             required
           />
 
-          <div className="frg_pss">
-            <label className="label_input" htmlFor="password-input">
+          <div className="frg_pss w-full flex justify-between mt-2">
+            <label className="label_input m-0" htmlFor="password-input">
               Password
             </label>
             {isLogin && setShowForgotModal && (
@@ -139,18 +152,52 @@ const MonkeyForm = ({
               </button>
             )}
           </div>
-          <input
-            spellCheck="false"
-            className="input"
-            type="text"
-            name="password"
-            id="password-input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+          
+          <div className="relative w-full">
+            <input
+              spellCheck="false"
+              className="input pr-12"
+              type="text"
+              name="password"
+              id="password-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <label htmlFor="blind-input" className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-[#80c241] hover:scale-110 transition-transform">
+              <span className="hide">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                </svg>
+              </span>
+              <span className="show">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </span>
+            </label>
+          </div>
 
-          <button className="submit" type="submit" disabled={isLoading}>
+          {/* Fixed height container for strength bar */}
+          {!isLogin && (
+            <div className="w-full h-4 mt-1 flex flex-col justify-center overflow-hidden">
+              {password && (
+                <div className="w-full flex items-center gap-2">
+                  <div className="flex-1 flex h-1.5 gap-1 rounded-full overflow-hidden">
+                    <div className={`flex-1 h-full transition-colors ${['Weak', 'Medium', 'Strong'].includes(strength) ? (strength === 'Weak' ? 'bg-red-500' : strength === 'Medium' ? 'bg-yellow-400' : 'bg-green-500') : 'bg-gray-200 dark:bg-gray-700'}`} />
+                    <div className={`flex-1 h-full transition-colors ${['Medium', 'Strong'].includes(strength) ? (strength === 'Medium' ? 'bg-yellow-400' : 'bg-green-500') : 'bg-gray-200 dark:bg-gray-700'}`} />
+                    <div className={`flex-1 h-full transition-colors ${strength === 'Strong' ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                  </div>
+                  <span className={`text-[10px] font-bold uppercase ${strength === 'Weak' ? 'text-red-500' : strength === 'Medium' ? 'text-yellow-500' : 'text-green-500'}`}>
+                    {strength}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button className="submit" type="submit" disabled={isSubmitDisabled}>
             {isLoading ? 'Processing...' : isLogin ? 'Login' : 'Register'}
           </button>
 
@@ -397,43 +444,12 @@ const StyledWrapper = styled.div`
     }
   }
 
-  .card label.blind_input {
-    -webkit-user-select: none;
-    user-select: none;
-    cursor: pointer;
-    z-index: 4;
-    position: absolute;
-    border: none;
-    right: calc(var(--p) + (var(--input-px) / 2));
-    bottom: calc(var(--p) + var(--submit-h) + var(--space-y) + 55px);
-    padding: 4px 0;
-    width: var(--blind-w);
-    border-radius: 4px;
-    background-color: #fff;
-    color: #4d4d4d;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .card label.blind_input:before {
-    content: '';
-    position: absolute;
-    left: calc((var(--input-px) / 2) * -1);
-    top: 0;
-    height: 100%;
-    width: 1px;
-    background: #8f8f8f;
-  }
-  .card label.blind_input:hover {
-    color: #262626;
-    background-color: #f2f2f2;
-  }
-  .blind-check ~ label.blind_input span.show,
-  .blind-check:checked ~ label.blind_input span.hide {
+  .blind-check ~ .form span.show,
+  .blind-check:checked ~ .form span.hide {
     display: none;
   }
-  .blind-check ~ label.blind_input span.hide,
-  .blind-check:checked ~ label.blind_input span.show {
+  .blind-check ~ .form span.hide,
+  .blind-check:checked ~ .form span.show {
     display: block;
   }
 
@@ -490,9 +506,7 @@ const StyledWrapper = styled.div`
     margin: var(--space-y) 0;
     transition: all 0.25s ease;
   }
-  .form .input#password-input {
-    padding-right: calc(var(--blind-w) + var(--input-px) + 4px);
-  }
+  
   .form .input:focus {
     border: 2px solid #80c241;
     outline: 0;
@@ -529,52 +543,25 @@ const StyledWrapper = styled.div`
     text-transform: uppercase;
     box-shadow: 0 4px 14px rgba(128, 194, 65, 0.4);
   }
-  .form .submit:hover {
+  .form .submit:hover:not(:disabled) {
     background-color: #0b4228;
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(11, 66, 40, 0.3);
   }
 
-  .form .submit:active {
+  .form .submit:active:not(:disabled) {
     transform: translateY(0);
+  }
+
+  .form .submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .blind-check:checked ~ .form .input#password-input {
     -webkit-text-security: disc;
   }
 
-  html.dark .card {
-    background-color: #1e293b; /* Matches our dark info panels */
-  }
-  html.dark .form .title {
-    color: #f8faf8;
-    border-bottom: 2px solid rgba(255, 255, 255, 0.2);
-  }
-  html.dark .form .label_input {
-    color: #e2e8f0;
-  }
-  html.dark .form .input {
-    background-color: #334155;
-    color: #f8faf8;
-    border: 1px solid #475569;
-  }
-  html.dark .card label.blind_input {
-    background-color: #334155;
-    color: #cbd5e1;
-  }
-  html.dark .card label.blind_input:before {
-    background: #475569;
-  }
-  html.dark .card label.blind_input:hover {
-    background-color: #475569;
-    color: #ffffff;
-  }
-  html.dark .form .frg_pss a {
-    color: #80c241; /* Smart Light Green */
-  }
-  html.dark .form .frg_pss a:hover {
-    color: #b2ff4a; /* Smart Glow */
-  }
   /* --- DARK MODE OVERRIDES --- */
   .dark & .card,
   html.dark & .card,
@@ -598,23 +585,6 @@ const StyledWrapper = styled.div`
     background-color: #334155;
     color: #f8faf8;
     border: 1px solid #475569;
-  }
-
-  .dark & .card label.blind_input,
-  html.dark & .card label.blind_input {
-    background-color: #334155;
-    color: #cbd5e1;
-  }
-
-  .dark & .card label.blind_input:before,
-  html.dark & .card label.blind_input:before {
-    background: #475569;
-  }
-
-  .dark & .card label.blind_input:hover,
-  html.dark & .card label.blind_input:hover {
-    background-color: #475569;
-    color: #ffffff;
   }
 
   .dark & .form .frg_pss a,

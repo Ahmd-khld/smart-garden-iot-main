@@ -129,6 +129,7 @@ app.use((req, res, next) => {
 });
 
 const { initTicketCron } = require('./cron/ticketCron');
+const grcService = require('./utils/grcService');
 
 mongoose
   .connect(process.env.MONGO_URI || 'mongodb://localhost:27017/smart-park')
@@ -136,6 +137,7 @@ mongoose
     console.log('MongoDB Connected');
     initAdmin();
     initTicketCron();
+    grcService.setIO(io);
   })
   .catch((err) => console.error('MongoDB connection error:', err));
 
@@ -175,6 +177,9 @@ const logAdminActionServer = async (req, actionDesc) => {
       userAgent: req.get('User-Agent') || 'Unknown',
     });
     if (io) io.emit('auditLogUpdate', log);
+    
+    // Live GRC Integration: Trigger risk assessment update on every admin action
+    grcService.triggerGRCUpdate();
   } catch (err) {
     console.error('Audit Log Error:', err);
   }

@@ -10,6 +10,7 @@ const bcrypt = require('bcrypt');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const grcService = require('../utils/grcService');
 
 const failedScans = new Map(); // Track failed scan attempts to prevent brute force
 
@@ -33,6 +34,9 @@ const logAdminAction = async (req, actionDesc) => {
     });
     const io = req.app.get('io');
     if (io) io.emit('auditLogUpdate', log);
+
+    // Live GRC Integration: Trigger risk assessment update on every admin action
+    grcService.triggerGRCUpdate();
   } catch (err) {
     console.error('Audit Log Error:', err);
   }
@@ -602,17 +606,20 @@ const toggleRestrictUser = async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       io.emit('userUpdated', {
-        _id: user._id,
+        _id: user._id.toString(),
         isRestricted: user.isRestricted,
         restrictionReason: user.restrictionReason,
       });
 
       if (user.isRestricted) {
         io.emit('accountRestricted', {
-          userId: user._id,
+          userId: user._id.toString(),
           message: user.restrictionReason || 'Your account has been restricted. Please contact support.',
         });
       }
+
+      // Global refresh signal for all admin dashboards
+      io.emit('dataRefresh');
     }
 
     await logAdminAction(
@@ -638,10 +645,12 @@ const createSubAdmin = async (req, res) => {
   try {
     const { name, email, password, ipAddress, macAddress } = req.body;
 
-    if (!name || !email || !password || !ipAddress) {
+    // Strict validation to reject null, undefined, or empty strings
+    if (!name || !email || !password || !ipAddress ||
+        name.trim() === '' || email.trim() === '' || password.trim() === '' || ipAddress.trim() === '') {
       return res
         .status(400)
-        .json({ message: 'Name, email, password, and bound IP Address are required' });
+        .json({ message: 'Name, email, password, and bound IP Address are required and cannot be empty' });
     }
 
     const userExists = await User.findOne({ email });

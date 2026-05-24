@@ -9,10 +9,11 @@ const User = require('../models/User');
 const BannedIP = require('../models/BannedIP');
 const Ticket = require('../models/Ticket');
 const AdminAuditLog = require('../models/AdminAuditLog');
+const grcService = require('../utils/grcService');
 
 // General Super Admin Exclusivity Check (Strictly admin@smartpark.com)
 const isSuperAdminAccount = (user) => {
-  const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase().trim();
+  const superAdminEmail = 'admin@smartpark.com';
   if (!user) return false;
   
   const userEmail = (user.email || '').toLowerCase().trim();
@@ -27,7 +28,7 @@ const isSuperAdminAccount = (user) => {
  * Diagnostic endpoint for authorization troubleshooting
  */
 router.get('/whoami', protect, async (req, res) => {
-  const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || 'admin@smartpark.com').toLowerCase();
+  const superAdminEmail = 'admin@smartpark.com';
   res.json({
     authenticatedUser: req.user.email,
     userRole: req.user.role,
@@ -69,62 +70,105 @@ router.post('/remediate', protect, async (req, res) => {
         result.message = `IP ${ip} has been successfully banned.`;
         break;
 
-      case 'block_user':
-        const { email, userId, targetUserId } = params;
-        const query = userId || targetUserId ? { _id: userId || targetUserId } : { email };
+      case 'block_user': {
+        const { email: targetEmail, userId, targetUserId } = params;
+        const uid = userId || targetUserId;
+        const blockQuery = uid ? { _id: uid } : { email: targetEmail };
+        
+        console.log(`[GRC Remediate] Attempting to block user. Query:`, blockQuery);
+
         const restrictedUser = await User.findOneAndUpdate(
-          query,
-          { isRestricted: true, restrictionReason: `Automated GRC Protocol: ${riskId}` },
+          blockQuery,
+          { 
+            isRestricted: true, 
+            restrictionReason: `Automated GRC Protocol: ${riskId || 'Manual Remediation'}` 
+          },
           { new: true }
         );
 
         if (restrictedUser) {
+          console.log(`[GRC Remediate] User ${restrictedUser.email} restricted successfully.`);
           result.message = `User ${restrictedUser.email} has been restricted via GRC auto-remediation.`;
-          
+
           // Emit socket events for real-time dashboard updates
           const io = req.app.get('io');
           if (io) {
-            io.emit('userUpdated', {
-              _id: restrictedUser._id,
+            const socketPayload = {
+              _id: restrictedUser._id.toString(),
               isRestricted: true,
               restrictionReason: restrictedUser.restrictionReason,
-            });
-
+            };
+            
+            io.emit('userUpdated', socketPayload);
             io.emit('accountRestricted', {
-              userId: restrictedUser._id,
+              userId: restrictedUser._id.toString(),
               message: restrictedUser.restrictionReason,
             });
+
+            // Global refresh signal for admin dashboards
+            io.emit('dataRefresh');
           }
         } else {
+          console.warn(`[GRC Remediate] User not found for query:`, blockQuery);
           result.message = 'Target user not found for restriction.';
         }
         break;
+      }
 
-      case 'reset_permissions':
+      case 'reset_permissions': {
         const { targetEmail } = params;
-        await User.findOneAndUpdate(
+        const resetUser = await User.findOneAndUpdate(
           { email: targetEmail },
-          { 
-            "permissions.hardwareControl": false, 
+          {
+            "permissions.hardwareControl": false,
             "permissions.systemSettings": false,
             "permissions.auditLogs": false,
             "permissions.userManagement": false
-          }
+          },
+          { new: true }
         );
         result.message = `Elevated permissions for ${targetEmail} have been revoked. The account role remains unchanged.`;
-        break;
 
-      case 'clear_backlog':
+        if (resetUser) {
+          const io = req.app.get('io');
+          if (io) {
+            io.emit('userUpdated', resetUser);
+            io.emit('dataRefresh');
+          }
+        }
+        break;
+      }
+
+      case 'clear_backlog': {
         // Mark auto-generated test tickets as CANCELLED
         const clearResult = await Ticket.updateMany(
           { promoCodeName: 'Auto-generated for GRC testing', status: 'INACTIVE' },
           { status: 'CANCELLED' }
         );
         result.message = `Cleared ${clearResult.modifiedCount} pending test tickets.`;
-        break;
 
+        const io = req.app.get('io');
+        if (io) {
+          io.emit('dataRefresh');
+        }
+        break;
+      }
       default:
         return res.status(400).json({ message: `Unsupported remediation action: ${action}` });
+    }
+
+    // 3. Mark the Risk as Resolved in MongoDB after successful action
+    if (riskId) {
+      await Risk.findOneAndUpdate(
+        { id: riskId },
+        { 
+          $set: { 
+            status: 'Resolved',
+            resolvedAt: new Date(),
+            resolvedBy: adminEmail
+          } 
+        }
+      );
     }
 
     // Log the remediation in Audit Logs
@@ -208,74 +252,18 @@ router.get('/summary', protect, async (req, res) => {
         throw new Error('Python script returned empty output');
       }
 
-      const parsedData = JSON.parse(stdoutData);
+      const rawData = JSON.parse(stdoutData);
 
-      // --- INSIDER THREAT DETECTION INJECTION ---
-      try {
-        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        
-        // Find admins who restricted more than 3 users in last 24h
-        // Note: The action string in logAdminAction (adminController.js) is "Restricted user: ..." or "Unrestricted user: ..."
-        const suspiciousAdmins = await AdminAuditLog.aggregate([
-          {
-            $match: {
-              createdAt: { $gte: twentyFourHoursAgo },
-              status: 'success',
-              action: { $regex: /^Restricted user:/i }
-            }
-          },
-          {
-            $group: {
-              _id: '$email',
-              count: { $sum: 1 }
-            }
-          },
-          {
-            $match: { count: { $gt: 3 } }
-          }
-        ]);
+      // --- FINAL SYNC, DETECTION & DEDUPLICATION ---
+      // Fixes the flickering Critical Risk count bug by using the centralized gatekeeper
+      const sanitizedData = await grcService.sanitizeAndSyncGRCData(rawData);
 
-        if (suspiciousAdmins.length > 0) {
-          for (const admin of suspiciousAdmins) {
-            const adminUser = await User.findOne({ email: admin._id }).select('_id');
-            if (adminUser) {
-              parsedData.risk_register.unshift({
-                id: `RISK-INSIDER-${admin._id}`,
-                category: 'Insider Threat',
-                description: `Sub-Admin ${admin._id} has restricted ${admin.count} users in the last 24 hours. This matches an "Insider Abuse" pattern.`,
-                likelihood: 4,
-                impact: 5,
-                status: 'Open',
-                createdAt: new Date().toISOString(),
-                offendingAdminId: adminUser._id,
-                recommendations: [
-                  {
-                    title: 'Restrict Rogue Admin',
-                    priority: 'critical',
-                    body: 'Immediately revoke all access for this administrative account to prevent further unauthorized system manipulation.',
-                    action: 'block_user',
-                    params: { userId: adminUser._id, email: admin._id }
-                  }
-                ]
-              });
-            }
-          }
-        }
-      } catch (logErr) {
-        console.error('Insider Threat Detection Failed:', logErr);
-      }
-      // --- END INJECTION ---
-
-      if (parsedData.error) {
-        console.error('GRC BRIDGE JSON ERROR:', parsedData.error);
-        return res.status(500).json({ message: 'GRC Bridge Error', error: parsedData.error });
+      if (sanitizedData.error) {
+        console.error('GRC BRIDGE JSON ERROR:', sanitizedData.error);
+        return res.status(500).json({ message: 'GRC Bridge Error', error: sanitizedData.error });
       }
 
-      if (!parsedData.timestamp) {
-        parsedData.timestamp = new Date().toISOString();
-      }
-
-      res.json(parsedData);
+      res.json(sanitizedData);
     } catch (parseError) {
       console.error('GRC JSON PARSE FATAL ERROR');
       console.error('Parse Error Message:', parseError.message);
@@ -374,6 +362,33 @@ router.patch('/compliance/:id', protect, async (req, res) => {
     console.error('Compliance Update Error:', error);
     res.status(500).json({ message: 'Failed to update compliance control', error: error.message });
   }
+});
+
+// @desc    Calculate Framework Adherence Score via Heuristic Codebase Scan
+// @route   GET /api/grc/adherence
+// @access  Super Admin
+router.get('/adherence', protect, async (req, res) => {
+  if (!isSuperAdminAccount(req.user)) {
+    return res.status(403).json({ message: 'Forbidden: Exclusive Super Admin access required' });
+  }
+  
+  const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+  const scriptPath = path.join(__dirname, '..', 'grc_bridge.py');
+
+  const child = spawn(pythonCommand, [scriptPath]);
+
+  let stdoutData = '';
+  child.stdout.on('data', (data) => { stdoutData += data.toString(); });
+
+  child.on('close', (code) => {
+    if (code !== 0) return res.status(500).json({ message: 'GRC Engine Failed' });
+    try {
+      const parsed = JSON.parse(stdoutData);
+      res.json(parsed.framework_adherence || { score: 0, checks: [] });
+    } catch (e) {
+      res.status(500).json({ message: 'Failed to parse GRC output' });
+    }
+  });
 });
 
 module.exports = router;
