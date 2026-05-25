@@ -1,5 +1,1 @@
-{
-  "/admin/dashboard/page": "app/admin/dashboard/page.js",
-  "/admin/telemetry/page": "app/admin/telemetry/page.js",
-  "/page": "app/page.js"
-}
+{}

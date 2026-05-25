@@ -1,11 +1,15 @@
 'use client';
 
 import React from 'react';
+import { usePathname } from 'next/navigation';
 import Navbar from './Navbar';
 import CloudBackground from './CloudBackground';
 import { socket } from '../socket';
 
 export default function ClientLayout({ children }) {
+  const pathname = usePathname();
+  const isAdminRoute = pathname?.startsWith('/admin');
+
   React.useEffect(() => {
     // 1. Listen for account restriction (Instant Kick)
     const handleAccountRestricted = (data) => {
