@@ -13,25 +13,25 @@ const cron = require('node-cron');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
 
-const User = require('./models/User');
-const Ticket = require('./models/Ticket');
-const AdminAuditLog = require('./models/AdminAuditLog');
-const BannedIP = require('./models/BannedIP');
-const WhitelistedIP = require('./models/WhitelistedIP');
-const HardwareAlert = require('./models/HardwareAlert');
+const User = require('../server/models/User');
+const Ticket = require('../server/models/Ticket');
+const AdminAuditLog = require('../server/models/AdminAuditLog');
+const BannedIP = require('../server/models/BannedIP');
+const WhitelistedIP = require('../server/models/WhitelistedIP');
+const HardwareAlert = require('../server/models/HardwareAlert');
 
-const { protect } = require('./middleware/authMiddleware');
-const { requireSuperAdmin, requireAdmin } = require('./middleware/superAdminMiddleware');
+const { protect } = require('../server/middleware/authMiddleware');
+const { requireSuperAdmin, requireAdmin } = require('../server/middleware/superAdminMiddleware');
 
-const ticketRoutes = require('./routes/ticketRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const grcRoutes = require('./routes/grcRoutes');
-const promoRoutes = require('./routes/promoRoutes');
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
-const gameRoutes = require('./routes/gameRoutes');
-const otpRoutes = require('./routes/otpRoutes');
-const hardwareRoutes = require('./routes/hardwareRoutes');
+const ticketRoutes = require('../server/routes/ticketRoutes');
+const adminRoutes = require('../server/routes/adminRoutes');
+const grcRoutes = require('../server/routes/grcRoutes');
+const promoRoutes = require('../server/routes/promoRoutes');
+const authRoutes = require('../server/routes/authRoutes');
+const userRoutes = require('../server/routes/userRoutes');
+const gameRoutes = require('../server/routes/gameRoutes');
+const otpRoutes = require('../server/routes/otpRoutes');
+const hardwareRoutes = require('../server/routes/hardwareRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -136,8 +136,8 @@ app.use((req, res, next) => {
   next();
 });
 
-const { initTicketCron } = require('./cron/ticketCron');
-const grcService = require('./utils/grcService');
+const { initTicketCron } = require('../server/cron/ticketCron');
+const grcService = require('../server/utils/grcService');
 
 mongoose
   .connect(process.env.MONGO_URI || 'mongodb://localhost:27017/smart-park')
