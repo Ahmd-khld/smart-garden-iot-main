@@ -1,15 +1,18 @@
 #include <SoftwareSerial.h>
 #include <Servo.h>
 #include <DHT.h>
-#include <Dhcp.h>
+#include "SmartParkHTTP.h"
 
 // ===================== ESP SETUP =====================
-SoftwareSerial esp(A4, A5); // RX, TX (A4 to ESP TX, A5 to ESP RX)
+SoftwareSerial espSerial(A4, A5); // RX, TX (A4 to ESP TX, A5 to ESP RX)
+SmartParkHTTP network(espSerial);
+
 const char* WIFI_SSID = "test";
 const char* WIFI_PASS = "12345678";
 const char* SERVER_IP = "192.168.137.1"; // Your backend IP
 
 // ===================== PIN DEFINITIONS =====================
+// ... (rest of pin definitions remain unchanged)
 #define MOISTURE_SENSOR_PIN A0
 #define PUMP_PIN 7
 #define DRY_THRESHOLD 500
@@ -54,10 +57,7 @@ bool manualServoOverride = false;
 bool manualLampOverride = false;
 
 // ===================== HELPERS =====================
-void sendTelemetryHTTP(int moisture, float humidity, float temp, int rgbDist, float servoDist, bool ldr, bool pump, bool isServoOpen) {
-  // Clear any garbage in the serial buffer before starting
-  while(esp.available()) { esp.read(); }
-
+void sendTelemetry(int moisture, float humidity, float temp, int rgbDist, float servoDist, bool ldr, bool pump, bool isServoOpen) {
   // Build JSON payload
   String payload = "{";
   payload += "\"moisture\":" + String(moisture) + ",";
@@ -70,58 +70,12 @@ void sendTelemetryHTTP(int moisture, float humidity, float temp, int rgbDist, fl
   payload += "\"servoStatus\":\"" + String(isServoOpen ? "OPEN" : "CLOSED") + "\"";
   payload += "}";
 
-  Serial.print(F("Connecting to "));
-  Serial.print(SERVER_IP);
-  Serial.println(F(":5000..."));
-
-  // Open TCP connection on mux ID 0
-  esp.print(F("AT+CIPSTART=0,\"TCP\",\""));
-  esp.print(SERVER_IP);
-  esp.println(F("\",5000"));
-  
-  // Use a longer timeout for connection
-  esp.setTimeout(5000);
-  if (esp.find("CONNECT") || esp.find("ALREADY CONNECTED")) {
-    // CRITICAL: Give the ESP a moment to stabilize the TCP link before sending data
-    delay(500); 
-    
-    Serial.println(F("TCP Connected. Sending HTTP POST..."));
-
-    // Build HTTP Request
-    String httpRequest = "POST /api/hardware/telemetry HTTP/1.1\r\n";
-    httpRequest += "Host: " + String(SERVER_IP) + "\r\n";
-    httpRequest += "Content-Type: application/json\r\n";
-    httpRequest += "Content-Length: " + String(payload.length()) + "\r\n";
-    httpRequest += "Connection: close\r\n\r\n";
-    httpRequest += payload;
-
-    // Send data
-    esp.print(F("AT+CIPSEND=0,"));
-    esp.println(httpRequest.length());
-    
-    // Give it more time to show the > prompt
-    esp.setTimeout(3000); 
-    if (esp.find(">")) {
-      esp.print(httpRequest);
-      Serial.println(F("Data transmitted. Waiting for response..."));
-      
-      // Look for the HTTP 200 response
-      esp.setTimeout(2000);
-      if (esp.find("200 OK")) {
-        Serial.println(F("SUCCESS: Telemetry logged."));
-      } else {
-        Serial.println(F("WARNING: No 200 OK received (Check server logs)."));
-      }
-    } else {
-      Serial.println(F("ERROR: No '>' prompt received."));
-    }
+  Serial.println(F("[System] Transmitting telemetry..."));
+  if (network.post(SERVER_IP, 5000, "/api/hardware/telemetry", payload)) {
+    Serial.println(F("[System] SUCCESS: Data logged."));
   } else {
-    Serial.println(F("ERROR: TCP connection failed (Timeout or IP Unreachable)."));
+    Serial.println(F("[System] WARNING: Telemetry transmission failed."));
   }
-  
-  // Clean up and reset timeout
-  esp.println(F("AT+CIPCLOSE=0"));
-  esp.setTimeout(1000);
 }
 
 inline void pwmWrite(int pin, uint8_t v) {
@@ -213,89 +167,10 @@ float measureDistanceServo() {
   return (t * 0.034) / 2;
 }
 
-// ===================== FIXES APPLIED HERE =====================
-void initWiFi() {
-  Serial.println(F("Resetting ESP8266..."));
-  esp.println(F("AT+RST"));
-  delay(3000);
-  
-  // Clear out the bootloader garbage text from the serial buffer
-  while(esp.available()) { esp.read(); }
-  
-  esp.println(F("AT+CWMODE=1")); 
-  delay(500);
-  
-  esp.println(F("AT+CIPMUX=1")); 
-  delay(500);
-  
-  Serial.print(F("Connecting to WiFi: "));
-  Serial.println(WIFI_SSID);
-  
-  esp.print(F("AT+CWJAP=\""));
-  esp.print(WIFI_SSID);
-  esp.print(F("\",\""));
-  esp.print(WIFI_PASS);
-  esp.println(F("\""));
-  
-  // CRITICAL FIX: Give the ESP up to 15 seconds to finish connecting to your router
-  esp.setTimeout(15000); 
-  
-  if (esp.find("WIFI GOT IP")) {
-    Serial.println(F("WiFi Connected successfully!"));
-    delay(1000); 
-    
-    // Print the IP address to the monitor
-    esp.setTimeout(1000); // Reset timeout back to normal
-    esp.println(F("AT+CIFSR")); 
-    delay(500);
-    Serial.println(F("\n===== ESP8266 NETWORK INFO ====="));
-    while (esp.available()) {
-      char c = esp.read();
-      Serial.write(c); 
-    }
-    Serial.println(F("================================\n"));
-  } else {
-    Serial.println(F("WiFi Connection Failed or Timed Out. Check SSID/Password."));
-    esp.setTimeout(1000); // Reset timeout back to normal
-  }
-}
-
-void handshakeWithServer() {
-  Serial.print(F("Opening persistent TCP Connection to "));
-  Serial.print(SERVER_IP);
-  Serial.println(F(":5000..."));
-
-  // Give the TCP connection attempt up to 5 seconds to connect
-  esp.setTimeout(5000);
-
-  esp.print(F("AT+CIPSTART=0,\"TCP\",\""));
-  esp.print(SERVER_IP);
-  esp.println(F("\",5000"));
-  
-  if (esp.find("CONNECT")) {
-    Serial.println(F("TCP Handshake Successful!"));
-    
-    String handshakeMsg = "HELLO_FROM_IOT_BOARD_PLACEHOLDER\n";
-    
-    esp.print(F("AT+CIPSEND=0,"));
-    esp.println(handshakeMsg.length());
-    delay(200); 
-    esp.print(handshakeMsg);
-    
-    Serial.println(F("TCP connection 0 left open for continuous data streaming."));
-  } else {
-    Serial.println(F("TCP Connection Failed. Ensure your backend server is running and firewall is off."));
-  }
-  
-  esp.setTimeout(1000); // Reset timeout back to normal
-}
-
 // ===================== SETUP =====================
 void setup() {
   Serial.begin(9600);
-  
-  // NOTE: If you used 115200 in your test to get "OK", change this to 115200!
-  esp.begin(9600); 
+  espSerial.begin(9600); 
 
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
@@ -315,63 +190,46 @@ void setup() {
   myServo.write(0);
   dht.begin();
 
-  // Run network setup routines
-  initWiFi();
-
-  // Start incoming command listener on Port 80
-  esp.println(F("AT+CIPSERVER=1,80"));
-  delay(2000);
+  // Initialize Network via Wrapper
+  if (network.connectWiFi(WIFI_SSID, WIFI_PASS)) {
+    Serial.println(F("System Online."));
+  } else {
+    Serial.println(F("System Offline. Check WiFi."));
+  }
 
   Serial.println(F("System fully initialized. Ready for automation."));
 }
 
 // ===================== LOOP =====================
 void loop() {
-  if (esp.available()) {
-    // Robust parsing for +IPD server data
-    if (esp.find("+IPD,")) {
-      int linkId = esp.parseInt(); // Get connection ID
-      if (esp.find(":")) {
-        String cmd = esp.readStringUntil('\n');
-        cmd.trim();
-        Serial.print(F("Remote Command Received [Link "));
-        Serial.print(linkId);
-        Serial.print(F("]: "));
-        Serial.println(cmd);
+  // Listen for Remote Commands via Wrapper
+  String cmd = network.listenForCommands();
+  if (cmd.length() > 0) {
+    Serial.print(F("Remote Command: "));
+    Serial.println(cmd);
 
-        if (cmd.indexOf("SERVO_ON") >= 0) {
-          myServo.write(90);
-          servoPos = 90;
-          manualServoOverride = true;
-          servoActive = false; 
-          Serial.println(F(">> Servo OPENED via Remote"));
-        }
-        else if (cmd.indexOf("SERVO_OFF") >= 0) {
-          myServo.write(0);
-          servoPos = 0;
-          manualServoOverride = true;
-          servoActive = false;
-          Serial.println(F(">> Servo CLOSED via Remote"));
-        }
-        else if (cmd.indexOf("SERVO_AUTO") >= 0) {
-          manualServoOverride = false;
-          Serial.println(F(">> Servo returned to AUTO mode"));
-        }
-        else if (cmd.indexOf("LAMP_ON") >= 0) {
-          digitalWrite(LDR_LED_PIN, HIGH);
-          manualLampOverride = true;
-          Serial.println(F(">> Lamp ON via Remote"));
-        }
-        else if (cmd.indexOf("LAMP_OFF") >= 0) {
-          digitalWrite(LDR_LED_PIN, LOW);
-          manualLampOverride = false;
-          Serial.println(F(">> Lamp OFF via Remote"));
-        }
-        
-        // Always close the connection after processing the command to free the mux
-        esp.print(F("AT+CIPCLOSE="));
-        esp.println(linkId);
-      }
+    if (cmd.indexOf("SERVO_ON") >= 0) {
+      myServo.write(90);
+      servoPos = 90;
+      manualServoOverride = true;
+      servoActive = false; 
+    }
+    else if (cmd.indexOf("SERVO_OFF") >= 0) {
+      myServo.write(0);
+      servoPos = 0;
+      manualServoOverride = true;
+      servoActive = false;
+    }
+    else if (cmd.indexOf("SERVO_AUTO") >= 0) {
+      manualServoOverride = false;
+    }
+    else if (cmd.indexOf("LAMP_ON") >= 0) {
+      digitalWrite(LDR_LED_PIN, HIGH);
+      manualLampOverride = true;
+    }
+    else if (cmd.indexOf("LAMP_OFF") >= 0) {
+      digitalWrite(LDR_LED_PIN, LOW);
+      manualLampOverride = false;
     }
   }
 
@@ -383,34 +241,19 @@ void loop() {
     }
 
     distance = measureDistanceCmRGB();
-    Serial.print(F("RGB Distance: "));
-    if (distance < 0) Serial.println(F("No echo"));
-    else Serial.println(distance);
     applyBandIfChanged(bandFromDistance(distance));
 
     int moistureValue = medianOf5Moisture();
-    Serial.print(F("Moisture: "));
-    Serial.println(moistureValue);
-
     float humidity = dht.readHumidity();
     float temperatureC = dht.readTemperature();
-
-    Serial.print(F("Humidity: "));
-    Serial.print(humidity);
-    Serial.print(F("%  Temp: "));
-    Serial.print(temperatureC);
-    Serial.println(F("°C"));
 
     if (moistureValid(moistureValue)) {
       if (moistureValue > DRY_THRESHOLD || (humidity < HUMIDITY_THRESHOLD && temperatureC > TEMP_THRESHOLD)) {
         digitalWrite(PUMP_PIN, HIGH);
-        Serial.println(F("Pump ON"));
       } else {
         digitalWrite(PUMP_PIN, LOW);
-        Serial.println(F("Pump OFF"));
       }
     } else {
-      Serial.println(F("Moisture invalid, pump OFF"));
       digitalWrite(PUMP_PIN, LOW);
     }
 
@@ -421,8 +264,6 @@ void loop() {
           myServo.write(90);
           servoPos = 90;
           servoActive = true;
-          Serial.print(F("Motion detected at "));
-          Serial.println(currentServoDist);
         }
         servoActiveTime = millis();
       }
@@ -430,12 +271,11 @@ void loop() {
         myServo.write(0);
         servoPos = 0;
         servoActive = false;
-        Serial.println(F("Servo returned to 0°"));
       }
     }
 
-    // --- Send HTTP Telemetry to Backend ---
-    sendTelemetryHTTP(
+    // --- Send HTTP Telemetry via Wrapper ---
+    sendTelemetry(
       moistureValue, 
       humidity, 
       temperatureC, 
@@ -445,7 +285,5 @@ void loop() {
       digitalRead(PUMP_PIN), 
       (servoPos == 90)
     );
-
-    Serial.println(F("------------------------"));
   }
 }
