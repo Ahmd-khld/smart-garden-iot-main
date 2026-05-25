@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminHeader from '../../../components/AdminHeader';
 import HardwareStatsWidget from '../../../components/HardwareStatsWidget';
+import TelemetryHistoryViewer from '../../../components/TelemetryHistoryViewer';
 import { useTelemetry } from '../../../context/TelemetryContext';
 import { socket } from '../../../socket';
 
@@ -64,7 +65,11 @@ const AdminTelemetry = () => {
           <div className="h-1 w-24 bg-smart-light mx-auto mt-4 rounded-full"></div>
         </div>
 
+        {/* 1. Live Matrix & Statistics */}
         <HardwareStatsWidget socket={socket} />
+
+        {/* 2. Historical Data Logs (NEW) */}
+        <TelemetryHistoryViewer />
 
         <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 md:p-10 border border-smart-light/20 shadow-2xl">
           <h3 className="text-lg font-black text-smart-dark dark:text-white uppercase tracking-tight mb-4 italic flex items-center">
@@ -76,7 +81,8 @@ const AdminTelemetry = () => {
           <p className="text-sm text-smart-gray dark:text-gray-400 leading-relaxed max-w-3xl">
             This page provides a dedicated, high-frequency stream of IoT sensor data from across the park. 
             Use the statistics above to monitor the real-time health of your hardware infrastructure. 
-            New alerts and state changes are pushed instantly via Socket.io.
+            New alerts and state changes are pushed instantly via Socket.io, and persistent historical 
+            logs are stored in the database for compliance auditing.
           </p>
         </div>
       </main>

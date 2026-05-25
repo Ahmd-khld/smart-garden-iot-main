@@ -108,7 +108,7 @@ const AdminDashboard = () => {
   const [userPage, setUserPage] = useState(1);
 
   const [monthlySales, setMonthlySales] = useState([]);
-  const [isMonthlySalesExpanded, setIsMonthlySalesExpanded] = useState(false);
+  const [isMonthlySalesExpanded, setIsMonthlySalesExpanded] = useState(true);
   const [salesStartDate, setSalesStartDate] = useState('');
   const [salesEndDate, setSalesEndDate] = useState('');
   const isSalesFilteredRef = useRef(false);
@@ -133,6 +133,7 @@ const AdminDashboard = () => {
   const isAuditLogsExpandedRef = useRef(isAuditLogsExpanded);
   const isHardwareAlertsExpandedRef = useRef(isHardwareAlertsExpanded);
   const isBannedIPsExpandedRef = useRef(isBannedIPsExpanded);
+  const [isSubAdminsExpanded, setIsSubAdminsExpanded] = useState(true);
 
   useEffect(() => {
     alertPageRef.current = alertPage;
@@ -435,6 +436,12 @@ const AdminDashboard = () => {
     fetchInsights();
     fetchStats();
   }, [fetchInsights, fetchStats, syncTrigger]);
+
+  useEffect(() => {
+    if (activeTab === 'collections') {
+      fetchPendingCashTickets();
+    }
+  }, [activeTab, cashFilterStatus, fetchPendingCashTickets]);
 
   const handleManualRefresh = async () => {
     setIsRefreshing(true);
@@ -750,16 +757,17 @@ const AdminDashboard = () => {
     if (!await showConfirm(`Confirm collection of ${amount} EGP for ticket ${ticketId}?`, 'Confirm Cash')) return;
     const token = localStorage.getItem('token');
     try {
-      await api.put(`/tickets/${ticketId}/confirm-cash`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      // Use the administrative endpoint which has more robust sub-admin authorization
+      await api.put(`/admin/activate-cash-ticket/${ticketId}`, {}, { headers: { Authorization: `Bearer ${token}` } });
       showModal('Cash collected. Ticket activated.', 'Success', 'success');
       setPendingCashTickets((prev) => prev.filter((t) => t._id !== ticketId));
       fetchStats();
     } catch (error) {
-      showModal('Failed to activate ticket.', 'Error', 'error');
+      console.error('Confirm Cash Error:', error);
+      showModal(error.response?.data?.message || 'Failed to activate ticket.', 'Error', 'error');
     }
   };
 
-  // CSV Export functions
   const handleExportCSV = () => {
     if (auditLogs.length === 0) return;
     const headers = ['Date', 'Email', 'Action', 'Status', 'IP Address'];
@@ -815,7 +823,7 @@ const AdminDashboard = () => {
     };
     const onOccupancyUpdate = (data) => setStats((prev) => prev ? { ...prev, currentOccupancy: data.currentOccupancy, capacityPercentage: data.capacityPercentage } : null);
     const onTotalTicketsUpdate = (data) => {
-      setStats((prev) => prev ? { ...prev, totalTicketsSold: data.totalTicketsSold, purchasingUsers: data.purchasingUsers } : null);
+      setStats((prev) => prev ? { ...prev, totalTicketsSold: data.totalTicketsSold, purchasingUsers: data.purchasingUsers, mostSoldTicket: data.mostSoldTicket } : null);
       setSyncTrigger((p) => p + 1);
     };
     const onDataRefresh = () => setSyncTrigger((p) => p + 1);
@@ -855,7 +863,7 @@ const AdminDashboard = () => {
   const tabs = [
     { id: 'overview', label: 'Overview & Stats', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
     { id: 'users', label: 'User Management', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-    { id: 'hardware', label: 'Gate & Hardware', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+    { id: 'hardware', label: 'Gate & Status', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
     { id: 'collections', label: 'Cash Collections', icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
     ...(isSuperAdmin ? [
       { id: 'access', label: 'Access Control', icon: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z' },
@@ -883,7 +891,7 @@ const AdminDashboard = () => {
         {/* Sidebar Navigation */}
         <aside className="hidden lg:flex flex-col w-72 py-6 pr-6 flex-shrink-0">
           <div className="bg-white dark:bg-gray-800 rounded-[30px] p-5 shadow-2xl border border-smart-light/10 dark:border-gray-700 sticky top-8 flex flex-col space-y-2">
-            <h3 className="text-[10px] font-black text-smart-gray dark:text-gray-500 uppercase tracking-widest mb-3 px-4 pt-2">Admin Modules</h3>
+            <h3 className="text-[10px] font-black text-smart-gray dark:text-gray-500 uppercase italic tracking-tighter mb-3 px-4 pt-2">Admin Modules</h3>
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -899,12 +907,12 @@ const AdminDashboard = () => {
 
         <main className="flex-1 min-w-0 px-6 py-8 w-full">
           {/* Mobile Tab Navigation */}
-          <div className="lg:hidden flex flex-nowrap space-x-4 bg-white dark:bg-gray-800 p-3 rounded-[40px] mb-8 overflow-x-auto whitespace-nowrap gap-4 no-scrollbar border border-smart-light/20 shadow-xl">
+          <div className="lg:hidden flex flex-nowrap space-x-4 bg-white dark:bg-gray-800 p-3 rounded-[40px] mb-8 overflow-x-auto whitespace-nowrap gap-4 scrollbar-hide no-scrollbar border border-smart-light/20 shadow-xl">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center flex-1 shrink-0 justify-center px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${activeTab === tab.id ? 'bg-smart-light text-white shadow-lg transform -translate-y-1' : 'bg-transparent text-smart-gray dark:text-gray-400 hover:bg-smart-light/10 dark:hover:bg-gray-700'}`}
+                className={`inline-flex items-center flex-1 shrink-0 justify-center px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${activeTab === tab.id ? 'bg-smart-light text-white shadow-lg transform -translate-y-1' : 'bg-transparent text-smart-gray dark:text-gray-400 hover:bg-smart-light/10 dark:hover:bg-gray-700'}`}
               >
                 <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={tab.icon}></path></svg>
                 {tab.label}
@@ -926,16 +934,14 @@ const AdminDashboard = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
-                {/* Tickets Sold Card */}
                 <div className="relative bg-white dark:bg-gray-800 rounded-full w-[240px] h-[240px] mx-auto flex flex-col items-center justify-center p-4 shadow-xl border-[10px] border-blue-500/20 hover:border-blue-500/40 transition-all transform hover:scale-105 text-center group">
                   <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center mb-3 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
                   </div>
-                  <h3 className="text-smart-gray dark:text-gray-400 font-black text-[10px] uppercase tracking-widest mb-1">Tickets Sold</h3>
+                  <h3 className="text-smart-gray dark:text-gray-400 font-black text-[10px] uppercase tracking-tighter mb-1">Tickets Sold</h3>
                   <span className="text-4xl font-black text-smart-dark dark:text-white italic">{stats?.totalTicketsSold || 0}</span>
                 </div>
 
-                {/* Occupancy Card with Ring */}
                 <div className="relative bg-white dark:bg-gray-800 rounded-full w-[240px] h-[240px] mx-auto flex flex-col items-center justify-center p-4 shadow-xl text-center transform transition-transform hover:scale-105 group">
                   <svg className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="46" fill="transparent" stroke="currentColor" strokeWidth="8" className="text-gray-100 dark:text-gray-700" />
@@ -944,32 +950,30 @@ const AdminDashboard = () => {
                   <div className="w-12 h-12 bg-smart-light/10 rounded-full flex items-center justify-center mb-3 text-smart-light group-hover:bg-smart-light group-hover:text-white transition-colors z-10">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                   </div>
-                  <h3 className="text-smart-gray font-black text-[10px] uppercase mb-1 z-10">Occupancy</h3>
+                  <h3 className="text-smart-gray font-black text-[10px] uppercase mb-1 z-10 tracking-tighter">Occupancy</h3>
                   <span className="text-4xl font-black text-smart-light italic z-10">{stats?.currentOccupancy || 0}</span>
-                  <span className="text-[10px] font-bold text-gray-500 z-10 uppercase">/ {stats?.maxCapacity || 1000}</span>
+                  <span className="text-[10px] font-bold text-gray-500 z-10 uppercase italic">/ {stats?.maxCapacity || 1000}</span>
                 </div>
 
-                {/* Most Sold Ticket Card */}
                 <div className="relative bg-white dark:bg-gray-800 rounded-full w-[240px] h-[240px] mx-auto flex flex-col items-center justify-center p-4 shadow-xl border-[10px] border-orange-500/20 hover:border-orange-500/40 transition-all transform hover:scale-105 text-center group">
                   <div className="w-12 h-12 bg-orange-500/10 rounded-full flex items-center justify-center mb-3 text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                   </div>
-                  <h3 className="text-smart-gray font-black text-[10px] uppercase mb-1">Most Sold Ticket</h3>
+                  <h3 className="text-smart-gray font-black text-[10px] uppercase mb-1 tracking-tighter">Popular Choice</h3>
                   <span className="text-lg font-black text-smart-dark dark:text-white uppercase italic leading-tight px-2">{stats?.mostSoldTicket || 'N/A'}</span>
                 </div>
 
-                {/* User Balance Card with Ring */}
                 <div className="relative bg-white dark:bg-gray-800 rounded-full w-[240px] h-[240px] mx-auto flex flex-col items-center justify-center p-4 shadow-xl text-center transform transition-transform hover:scale-105 group">
                   <svg className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none" viewBox="0 0 100 100">
                     <circle cx="50" cy="50" r="46" fill="transparent" stroke="currentColor" strokeWidth="8" className="text-gray-100 dark:text-gray-700" />
-                    <circle cx="50" cy="50" r="46" fill="transparent" stroke="currentColor" strokeWidth="8" strokeDasharray="289" strokeDashoffset={289 - 289 * (stats?.activeUsers ? stats.purchasingUsers / stats.activeUsers : 0)} strokeLinecap="round" className="text-smart-glow transition-all duration-1000" />
+                    <circle cx="50" cy="50" r="46" fill="transparent" stroke="currentColor" strokeWidth="8" strokeDasharray="289" strokeDashoffset={289 - (289 * (stats?.activeUsers ? stats.purchasingUsers / stats.activeUsers : 0)) } strokeLinecap="round" className="text-smart-glow transition-all duration-1000" />
                   </svg>
                   <div className="w-12 h-12 bg-smart-glow/10 rounded-full flex items-center justify-center mb-3 text-smart-glow group-hover:bg-smart-glow group-hover:text-white transition-colors z-10">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                   </div>
-                  <h3 className="text-smart-gray font-black text-[10px] uppercase mb-1 z-10">Entity Balance</h3>
+                  <h3 className="text-smart-gray font-black text-[10px] uppercase mb-1 z-10 tracking-tighter">User Balance</h3>
                   <span className="text-4xl font-black text-smart-dark dark:text-white italic z-10">{stats?.purchasingUsers || 0}</span>
-                  <span className="text-[10px] font-bold text-gray-500 z-10 uppercase">of {stats?.activeUsers || 0} Users</span>
+                  <span className="text-[10px] font-bold text-gray-500 z-10 uppercase italic">of {stats?.activeUsers || 0} Active</span>
                 </div>
               </div>
 
@@ -999,7 +1003,7 @@ const AdminDashboard = () => {
                 <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center cursor-pointer hover:bg-smart-bg/80 dark:hover:bg-gray-800 transition-colors" onClick={() => setIsCrowdInsightsExpanded(!isCrowdInsightsExpanded)}>
                   <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic select-none">
                     <svg className="w-6 h-6 mr-3 text-smart-light" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                    Crowd Insights Window
+                    Crowd Insights Grid
                   </h2>
                   <div className="flex items-center space-x-6">
                     <div className="flex items-center space-x-2">
@@ -1036,7 +1040,7 @@ const AdminDashboard = () => {
                 <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center cursor-pointer hover:bg-smart-bg/80 dark:hover:bg-gray-800 transition-colors" onClick={() => setIsMonthlySalesExpanded(!isMonthlySalesExpanded)}>
                   <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic select-none">
                     <svg className="w-6 h-6 mr-3 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                    Historical Ticket Sales
+                    Monthly Sales Trend Table
                   </h2>
                   <div className="flex items-center text-smart-gray dark:text-gray-400">
                     <button onClick={(e) => { e.stopPropagation(); handleExportMonthlySalesCSV(); }} className="hidden sm:flex items-center mr-4 px-3 py-1.5 bg-smart-light/10 hover:bg-smart-light/20 text-smart-light rounded-lg text-[10px] font-bold uppercase tracking-widest transition-colors border border-smart-light/20">
@@ -1047,20 +1051,42 @@ const AdminDashboard = () => {
                   </div>
                 </div>
                 {isMonthlySalesExpanded && (
-                  <div className="p-8 overflow-x-auto">
+                  <div className="p-8">
                     {monthlySales.length > 0 ? (
-                      <div className="flex items-end justify-between space-x-4 min-w-[600px] h-64 mt-4 mb-4 border-b-2 border-smart-light/20 pb-4">
-                        {monthlySales.map((sale, idx) => {
-                          const heightPercent = Math.max((sale.totalTickets / maxMonthlySales) * 100, 5);
-                          return (
-                            <div key={idx} className="flex flex-col items-center justify-end w-full h-full group relative">
-                              <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-opacity text-center bg-smart-dark text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">{sale.totalTickets} Sold</div>
-                              <div className="w-full max-w-[50px] bg-smart-light/20 group-hover:bg-smart-light transition-colors rounded-t-xl relative border border-smart-light/30" style={{ height: `${heightPercent}%` }}></div>
-                              <div className="absolute -bottom-10 text-[10px] font-black text-smart-gray dark:text-gray-400 uppercase tracking-tighter text-center w-full">{sale.month}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                      <>
+                        <div className="flex items-end justify-between space-x-4 min-w-[600px] h-64 mt-4 mb-4 border-b-2 border-smart-light/20 pb-4 overflow-x-auto">
+                          {monthlySales.map((sale, idx) => {
+                            const heightPercent = Math.max((sale.totalTickets / maxMonthlySales) * 100, 5);
+                            return (
+                              <div key={idx} className="flex flex-col items-center justify-end w-full h-full group relative">
+                                <div className="absolute -top-12 opacity-0 group-hover:opacity-100 transition-opacity text-center bg-smart-dark text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg whitespace-nowrap z-10">{sale.totalTickets} Sold</div>
+                                <div className="w-full max-w-[50px] bg-smart-light/20 group-hover:bg-smart-light transition-colors rounded-t-xl relative border border-smart-light/30" style={{ height: `${heightPercent}%` }}></div>
+                                <div className="absolute -bottom-10 text-[10px] font-black text-smart-gray dark:text-gray-400 uppercase tracking-tighter text-center w-full">{sale.month}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-12 overflow-x-auto">
+                          <table className="w-full text-left">
+                            <thead>
+                              <tr className="bg-smart-bg dark:bg-gray-900 border-b border-smart-light/10 text-smart-gray dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">
+                                <th className="px-6 py-4">Month</th>
+                                <th className="px-6 py-4 text-center">Tickets Sold</th>
+                                <th className="px-6 py-4 text-right">Revenue (EGP)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-smart-bg dark:divide-gray-700">
+                              {monthlySales.map((sale, idx) => (
+                                <tr key={idx} className="hover:bg-smart-bg/50 dark:hover:bg-gray-700/50 transition-colors">
+                                  <td className="px-6 py-4 font-black text-smart-dark dark:text-white uppercase italic text-sm">{sale.month}</td>
+                                  <td className="px-6 py-4 text-center text-smart-gray dark:text-gray-400 font-bold">{sale.totalTickets}</td>
+                                  <td className="px-6 py-4 text-right font-black text-smart-dark dark:text-white italic">{sale.revenue}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
                     ) : <div className="p-12 text-center text-smart-gray font-black uppercase tracking-widest">No sales data found.</div>}
                   </div>
                 )}
@@ -1071,9 +1097,9 @@ const AdminDashboard = () => {
           {activeTab === 'users' && (
             <div className="mb-10 bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden animate-fade-in-up">
               <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center cursor-pointer" onClick={() => setIsUserManagementExpanded(!isUserManagementExpanded)}>
-                <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic italic">
+                <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic">
                   <svg className="w-6 h-6 mr-3 text-smart-light" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                  User Management
+                  User Management Registry
                 </h2>
                 <div className="flex items-center text-smart-gray dark:text-gray-400">
                   <button onClick={(e) => { e.stopPropagation(); handleExportUsersCSV(); }} className="hidden sm:flex items-center mr-4 px-3 py-1.5 bg-smart-light/10 hover:bg-smart-light/20 text-smart-light rounded-lg text-[10px] font-bold uppercase tracking-widest border border-smart-light/20 transition-colors">Export CSV</button>
@@ -1134,7 +1160,6 @@ const AdminDashboard = () => {
 
           {activeTab === 'hardware' && (
             <div className="animate-fade-in space-y-10">
-              {/* Live Sensor Matrix */}
               <div className="bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden">
                 <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center">
                   <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic select-none">
@@ -1152,13 +1177,12 @@ const AdminDashboard = () => {
                   ].map((sensor, idx) => (
                     <div key={idx} className="flex flex-col items-center p-6 bg-smart-bg dark:bg-gray-900 rounded-[35px] border border-smart-light/10 shadow-inner">
                       <span className="text-[9px] font-black text-smart-gray uppercase mb-3 tracking-widest">{sensor.label}</span>
-                      <span className="text-3xl font-black text-smart-dark dark:text-white italic">{sensor.value || 0}</span>
+                      <span className="text-3xl font-black text-smart-dark dark:text-white italic tracking-tighter">{sensor.value || 0}</span>
                     </div>
                   ))}
                 </div>
-                {/* Actuator Controls */}
                 <div className="bg-smart-bg/30 dark:bg-gray-900/30 px-8 py-6 border-t border-smart-light/10 flex flex-wrap gap-4 items-center">
-                  <span className="text-[10px] font-black text-smart-gray uppercase tracking-widest mr-4 italic">Remote Actuators</span>
+                  <h3 className="text-[10px] font-black text-smart-gray uppercase tracking-tighter mr-4 italic">Remote Actuators</h3>
                   <div className="flex bg-white dark:bg-gray-800 p-2 rounded-2xl border border-smart-light/10 shadow-sm">
                     <span className="px-4 text-[10px] font-black text-smart-gray uppercase tracking-widest flex items-center">Gate Servo</span>
                     <button onClick={() => handleHardwareCommand('SERVO_ON')} className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl text-[10px] font-black uppercase transition-all">Open</button>
@@ -1172,11 +1196,10 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              {/* QR Scanner and Manual Entry Row */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
                 <div className="xl:col-span-1 bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 overflow-hidden flex flex-col">
                   <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex flex-col items-center">
-                    <h2 className="text-xl font-black italic uppercase tracking-tighter mb-4">Optical Node</h2>
+                    <h3 className="text-xl font-black italic uppercase tracking-tighter mb-4">Optical Node Scanner</h3>
                     <div className="flex gap-2">
                       <button onClick={handleToggleSensor} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase transition-all shadow-md text-white ${isCameraActive ? 'bg-red-500' : 'bg-green-500'}`}>{isCameraActive ? 'Halt Sensor' : 'Authorize Sensor'}</button>
                     </div>
@@ -1208,12 +1231,11 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Hardware Alerts Table */}
                 <div id="hardware-alerts-panel" className="xl:col-span-2 bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 flex flex-col overflow-hidden">
                   <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center">
-                    <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic italic">
+                    <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic">
                       <svg className="w-6 h-6 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                      Hardware Alerts
+                      Hardware Alerts Log
                     </h2>
                     <select value={alertFilterType} onChange={(e) => { setAlertFilterType(e.target.value); fetchAlertsPage(1); }} className="px-4 py-2 rounded-xl border-2 border-smart-light/20 bg-white dark:bg-gray-800 text-smart-dark dark:text-white font-mono text-[10px] font-black uppercase tracking-widest cursor-pointer">
                       <option value="all">ALL ALERTS</option><option value="warning">WARNINGS</option><option value="info">INFO</option><option value="error">ERRORS</option><option value="success">SUCCESS</option>
@@ -1255,7 +1277,7 @@ const AdminDashboard = () => {
               <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center">
                 <h2 className="text-xl font-black italic uppercase tracking-tighter flex items-center">
                   <svg className="w-6 h-6 mr-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                  Cash Collections
+                  Cash Collections Portal
                 </h2>
                 <div className="flex bg-white dark:bg-gray-800 p-1 rounded-xl border border-smart-light/10">
                   <button onClick={() => setCashFilterStatus('PENDING')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${cashFilterStatus === 'PENDING' ? 'bg-smart-light text-white shadow-md' : 'text-smart-gray'}`}>Pending</button>
@@ -1284,20 +1306,19 @@ const AdminDashboard = () => {
 
           {activeTab === 'access' && isSuperAdmin && (
             <div className="space-y-10 animate-fade-in-up">
-              {/* Sub-Admin Registry */}
               <div className="bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden flex flex-col">
                 <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center cursor-pointer" onClick={() => setIsSubAdminsExpanded(!isSubAdminsExpanded)}>
-                  <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic italic">
+                  <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic">
                     <svg className="w-6 h-6 mr-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                     Sub-Admin Registry
                   </h2>
-                  <span className="text-xs font-bold text-smart-gray uppercase tracking-widest">{subAdmins.length} Active Nodes</span>
+                  <span className="text-xs font-bold text-smart-gray uppercase tracking-widest">{subAdmins.length} Nodes</span>
                 </div>
                 {isSubAdminsExpanded && (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead>
-                        <tr className="bg-smart-bg dark:bg-gray-900 border-b border-smart-light/10 text-smart-gray text-[10px] font-black uppercase tracking-widest">
+                        <tr className="bg-smart-bg dark:bg-gray-900 border-b border-smart-light/10 text-smart-gray dark:text-gray-500 text-[10px] font-black uppercase tracking-widest">
                           <th className="px-6 py-4">Identity</th><th className="px-6 py-4">Security Status</th><th className="px-6 py-4 text-right">Actions</th>
                         </tr>
                       </thead>
@@ -1322,7 +1343,6 @@ const AdminDashboard = () => {
                 )}
               </div>
 
-              {/* Authorize New Node Form */}
               <div className="bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden">
                 <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10"><h2 className="text-xl font-black italic uppercase tracking-tighter">Authorize New Node</h2></div>
                 <div className="p-8"><form onSubmit={handleCreateSubAdmin} className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1338,10 +1358,9 @@ const AdminDashboard = () => {
 
           {activeTab === 'security' && isSuperAdmin && (
             <div className="space-y-10 animate-fade-in-up">
-              {/* Audit Logs Registry */}
               <div id="audit-logs-panel" className="bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden flex flex-col">
                 <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center cursor-pointer" onClick={() => setIsAuditLogsExpanded(!isAuditLogsExpanded)}>
-                  <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic italic">
+                  <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic">
                     <svg className="w-6 h-6 mr-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
                     Security Audit Registry
                   </h2>
@@ -1372,10 +1391,9 @@ const AdminDashboard = () => {
                 )}
               </div>
 
-              {/* Banned IP Nodes Registry */}
               <div id="banned-ips-panel" className="bg-white dark:bg-gray-800 rounded-[40px] shadow-2xl border border-smart-light/10 dark:border-gray-700 overflow-hidden flex flex-col">
                 <div className="bg-smart-bg dark:bg-gray-900 px-8 py-6 border-b border-smart-light/10 flex justify-between items-center cursor-pointer" onClick={() => setIsBannedIPsExpanded(!isBannedIPsExpanded)}>
-                  <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic italic">
+                  <h2 className="text-xl font-black text-smart-dark dark:text-white flex items-center tracking-tighter uppercase italic">
                     <svg className="w-6 h-6 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                     Banned IP Nodes
                   </h2>

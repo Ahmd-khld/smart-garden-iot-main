@@ -1413,12 +1413,19 @@ const generateMockData = async (req, res) => {
           if (Math.random() > 0.9) currentStatus = 'CANCELLED';
         }
 
+        // Randomize payment method for simulation
+        const isCash = Math.random() > 0.7;
+        const paymentMethod = isCash ? 'CASH' : 'ONLINE';
+        const paymentStatus = isCash ? (currentStatus === 'ACTIVE' || currentStatus === 'USED' ? 'PAID' : 'PENDING') : 'PAID';
+
         ticketDocs.push({
           userId: user._id,
           ticketType: type,
           subscriptionPlan: 'one-time',
           price: ticketPrices[type],
-          status: currentStatus,
+          status: isCash && paymentStatus === 'PENDING' ? 'INACTIVE' : currentStatus,
+          paymentMethod,
+          paymentStatus,
           validFrom,
           validUntil,
           createdAt: new Date(),

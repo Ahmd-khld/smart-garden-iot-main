@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { socket } from '../socket';
+import api from '../api';
 
 const TelemetryContext = createContext();
 
@@ -61,8 +62,29 @@ export const TelemetryProvider = ({ children }) => {
     );
   };
 
-  // --- Real-time WebSocket Logic ---
+  // --- Initial Data Fetch & Real-time WebSocket Logic ---
   useEffect(() => {
+    // 1. Fetch initial state from in-memory cache on backend
+    const fetchInitialState = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await api.get('/hardware/current', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data && res.data.timestamp) {
+          setLiveReadings({
+            ...res.data,
+            lastUpdate: new Date(res.data.timestamp).toLocaleTimeString()
+          });
+        }
+      } catch (err) {
+        console.warn('Could not fetch initial telemetry state:', err.message);
+      }
+    };
+
+    fetchInitialState();
+
     const onHardwareAlert = (newAlert) => {
       const formattedAlert = {
         _id: newAlert.id || newAlert._id,
@@ -73,15 +95,12 @@ export const TelemetryProvider = ({ children }) => {
         createdAt: newAlert.createdAt || new Date().toISOString(),
       };
 
-      // 1. Update Feed (Keep global state in sync)
       setAlerts((prev) => {
         const exists = prev.find(a => a._id === formattedAlert._id);
         if (exists) return prev;
         return [formattedAlert, ...prev].slice(0, 100);
       });
       setTotalAlertsCount((prev) => prev + 1);
-
-      // 2. Update Matrix
       updateMatrixWithAlert(formattedAlert);
     };
 

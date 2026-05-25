@@ -3,6 +3,18 @@ const Telemetry = require('../models/Telemetry');
 const net = require('net');
 
 let espIpAddress = null;
+let latestTelemetryReading = {
+  moisture: 0,
+  humidity: 0,
+  temperature: 0,
+  rgbDistance: 0,
+  servoDistance: 0,
+  ldrStatus: 'OFF',
+  pumpStatus: 'OFF',
+  servoStatus: 'CLOSED',
+  ipAddress: 'N/A',
+  timestamp: null
+};
 
 /**
  * Receives live telemetry from ESP8266, logs it to DB, and broadcasts it to the dashboard.
@@ -28,22 +40,25 @@ const receiveTelemetry = async (req, res) => {
       timestamp: new Date()
     };
 
-    // 1. LOG TO DATABASE
+    // 1. UPDATE IN-MEMORY COPY
+    latestTelemetryReading = {
+      ...telemetryData,
+      timestamp: telemetryData.timestamp.toISOString()
+    };
+
+    // 2. LOG TO DATABASE (PERSISTENT LOGS)
     await Telemetry.create(telemetryData);
 
     const io = req.app.get('io');
     if (io) {
       console.log('[Hardware] Broadcasting liveTelemetry to all clients...');
-      // 2. BROADCAST TO DASHBOARD (send ISO string for frontend compatibility)
-      io.emit('liveTelemetry', {
-        ...telemetryData,
-        timestamp: telemetryData.timestamp.toISOString()
-      });
+      // 3. BROADCAST TO DASHBOARD (send ISO string for frontend compatibility)
+      io.emit('liveTelemetry', latestTelemetryReading);
     } else {
       console.warn('[Hardware] Cannot broadcast: io instance not found on app.');
     }
 
-    // 3. AUTOMATED MONITORING / ALERTS
+    // 4. AUTOMATED MONITORING / ALERTS
     if (moisture > 800) {
       const alert = await HardwareAlert.create({
         sensor: 'Soil Moisture',
@@ -62,13 +77,22 @@ const receiveTelemetry = async (req, res) => {
 };
 
 /**
- * Fetches recent telemetry history for the dashboard.
+ * Returns the latest telemetry reading from memory (High Performance)
+ */
+const getCurrentTelemetry = (req, res) => {
+  res.status(200).json(latestTelemetryReading);
+};
+
+/**
+ * Fetches recent telemetry history for the dashboard from the DB.
  */
 const getTelemetryHistory = async (req, res) => {
   try {
-    const history = await Telemetry.find().sort({ timestamp: -1 }).limit(50);
-    res.json(history);
+    const limit = parseInt(req.query.limit) || 50;
+    const history = await Telemetry.find().sort({ timestamp: -1 }).limit(limit).lean();
+    res.status(200).json(history);
   } catch (error) {
+    console.error('Fetch Telemetry History Error:', error);
     res.status(500).json({ message: 'Failed to fetch telemetry history' });
   }
 };
@@ -108,4 +132,9 @@ const sendControlCommand = async (req, res) => {
   });
 };
 
-module.exports = { receiveTelemetry, sendControlCommand, getTelemetryHistory };
+module.exports = { 
+  receiveTelemetry, 
+  sendControlCommand, 
+  getTelemetryHistory,
+  getCurrentTelemetry 
+};
