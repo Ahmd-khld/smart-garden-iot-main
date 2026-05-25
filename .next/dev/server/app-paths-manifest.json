@@ -1,3 +1,11 @@
 {
-  "/page": "app/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/admin/alerts/page": "app/admin/alerts/page.js",
+  "/admin/dashboard/page": "app/admin/dashboard/page.js",
+  "/admin/grc/page": "app/admin/grc/page.js",
+  "/admin/telemetry/page": "app/admin/telemetry/page.js",
+  "/book/page": "app/book/page.js",
+  "/page": "app/page.js",
+  "/payment/page": "app/payment/page.js",
+  "/profile/page": "app/profile/page.js"
 }

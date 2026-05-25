@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import MonkeyForm from '../components/MonkeyForm.jsx';
+import MonkeyForm from '../components/MonkeyForm';
 import api from '../api';
 
 const LandingPage = () => {
@@ -20,10 +20,12 @@ const LandingPage = () => {
   const [forgotMessage, setForgotMessage] = useState({ type: '', text: '' });
   const [isForgotLoading, setIsForgotLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [token, setToken] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
     setIsMounted(true);
+    setToken(localStorage.getItem('token'));
   }, []);
 
   const handleAuth = async (e) => {
@@ -105,12 +107,12 @@ const LandingPage = () => {
     }
   };
 
-  const showLoginForm = isMounted && !localStorage.getItem('token');
+  const showLoginForm = isMounted && !token;
 
   return (
     <div className="flex flex-col min-h-screen bg-smart-bg dark:bg-black transition-colors duration-300">
-      <main className="flex-grow flex flex-col md:flex-row max-w-6xl mx-auto px-6 py-12 gap-12 items-center">
-        <div className="flex-1 space-y-8" id="features">
+      <main className="flex-grow flex flex-col md:flex-row max-w-6xl mx-auto px-6 py-12 gap-12 items-center justify-center">
+        <div className={`flex-1 space-y-8 ${!showLoginForm ? 'max-w-2xl text-center' : ''}`} id="features">
           <div>
             <h2 className="text-2xl md:text-4xl font-extrabold text-smart-dark dark:text-smart-glow mb-4 italic tracking-tight">
               Welcome to the Future of Parks
@@ -141,7 +143,36 @@ const LandingPage = () => {
               <h3 className="text-xl font-bold text-smart-dark dark:text-white mb-2">Smart Bins</h3>
               <p className="text-smart-gray dark:text-gray-400">Connected waste bins notify maintenance when full, keeping the park pristine.</p>
             </div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-smart-light/20 dark:border-gray-700 hover:shadow-md transition-all group">
+              <div className="w-12 h-12 bg-smart-light/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-smart-light transition-colors">
+                <svg className="w-6 h-6 text-smart-light group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 21.5c-3.3 0-6-2.7-6-6 0-3.3 3.5-8.5 5.4-11 .3-.4.9-.4 1.2 0 1.9 2.5 5.4 7.7 5.4 11 0 3.3-2.7 6-6 6z"></path>
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-smart-dark dark:text-white mb-2">Automated Irrigation</h3>
+              <p className="text-smart-gray dark:text-gray-400">Soil moisture sensors ensure our greenery gets exactly the water it needs, conserving resources.</p>
+            </div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-smart-light/20 dark:border-gray-700 hover:shadow-md transition-all group">
+              <div className="w-12 h-12 bg-yellow-400/10 rounded-full flex items-center justify-center mb-4 group-hover:bg-yellow-400 transition-colors">
+                <svg className="w-6 h-6 text-yellow-500 group-hover:text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.989-2.386l-.548-.547z"></path>
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-smart-dark dark:text-white mb-2">Adaptive Lighting</h3>
+              <p className="text-smart-gray dark:text-gray-400">Smart LDR sensors adjust park lighting based on ambient conditions, saving energy and reducing pollution.</p>
+            </div>
           </div>
+
+          {!showLoginForm && isMounted && (
+            <div className="pt-8">
+              <button 
+                onClick={() => router.push(localStorage.getItem('role')?.includes('admin') ? '/admin/dashboard' : '/book')}
+                className="bg-smart-light hover:bg-smart-dark text-white font-black py-4 px-10 rounded-2xl transition-all shadow-xl hover:shadow-smart-light/20 active:scale-95 uppercase tracking-widest text-sm"
+              >
+                Go to {localStorage.getItem('role')?.includes('admin') ? 'Admin Panel' : 'Booking Center'}
+              </button>
+            </div>
+          )}
         </div>
 
         {showLoginForm && (

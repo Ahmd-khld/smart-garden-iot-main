@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "NODE_ENV=production node server.js",
-    "build": "next build"
+    "build": "next build",
+    "create-admin": "node server/create-admin-interactive.js"
   },
   "dependencies": {
     "axios": "^1.16.1",

@@ -203,7 +203,7 @@ router.get('/summary', protect, async (req, res) => {
   }
 
   const { framework } = req.query;
-  const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+  const pythonCommand = process.platform === 'win32' ? 'python' : path.join(__dirname, '..', 'venv', 'bin', 'python3');
   const scriptPath = path.join(__dirname, '..', 'grc_bridge.py');
 
   console.log(`DEBUG: Executing GRC Bridge: ${pythonCommand} "${scriptPath}" ${framework || 'CIS_V8'}`);
@@ -371,7 +371,7 @@ router.get('/adherence', protect, async (req, res) => {
     return res.status(403).json({ message: 'Forbidden: Exclusive Super Admin access required' });
   }
   
-  const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+  const pythonCommand = process.platform === 'win32' ? 'python' : path.join(__dirname, '..', 'venv', 'bin', 'python3');
   const scriptPath = path.join(__dirname, '..', 'grc_bridge.py');
 
   const child = spawn(pythonCommand, [scriptPath]);

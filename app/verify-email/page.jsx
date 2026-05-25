@@ -64,7 +64,7 @@ const VerifyEmailContent = () => {
         if (data.role === 'admin' || data.role === 'sub-admin') {
           const storedEmail = (data.email || email).toLowerCase().trim();
           localStorage.setItem('adminEmail', storedEmail);
-          router.push('/admin');
+          router.push('/admin/dashboard');
         } else {
           router.push('/book');
         }

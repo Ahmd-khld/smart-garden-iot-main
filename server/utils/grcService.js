@@ -243,7 +243,7 @@ const runRiskAssessment = async () => {
   isUpdating = true;
 
   return new Promise((resolve) => {
-    const pythonCommand = process.platform === 'win32' ? 'python' : 'python3';
+    const pythonCommand = process.platform === 'win32' ? 'python' : path.join(__dirname, '..', 'venv', 'bin', 'python3');
     const scriptPath = path.join(__dirname, '..', 'grc_bridge.py');
 
     console.log(`[GRC-Service] Executing live risk re-assessment...`);

@@ -9,8 +9,8 @@ const Navbar = () => {
   const router = useRouter();
 
   const [auth, setAuth] = React.useState({
-    token: typeof window !== 'undefined' ? localStorage.getItem('token') : null,
-    role: typeof window !== 'undefined' ? localStorage.getItem('role') : null,
+    token: null,
+    role: null,
   });
 
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
@@ -57,12 +57,13 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 md:h-24 flex justify-between items-center">
         <Link
           href="/"
-          className="hover:opacity-90 transition transform shrink-0 z-20 -my-4 md:-my-8"
+          className="hover:opacity-90 transition transform shrink-0 z-20"
         >
-          {/* logo will be handled by Next.js image optimization or just a simple img tag for now */}
-          <div className="h-24 md:h-36 w-auto flex items-center justify-center font-black text-2xl italic tracking-tighter text-white drop-shadow-xl">
-            SMART PARK
-          </div>
+          <img
+            src="/assets/logo.png"
+            alt="SMART PARK"
+            className="h-12 md:h-16 w-auto object-contain drop-shadow-xl"
+          />
         </Link>
 
         {/* Desktop Nav Links */}

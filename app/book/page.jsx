@@ -69,7 +69,7 @@ const BookingPage = () => {
   const getWeekWindow = () => {
     const now = new Date();
     const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    weekEnd = new Date(weekStart);
+    const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
     return { weekStart, weekEnd };
   };
@@ -201,8 +201,13 @@ const BookingPage = () => {
       return;
     }
 
-    // Pass state via URL or complex context if needed, 
-    // but for now we'll just navigate.
+    // Pass state via localStorage for the payment page to retrieve.
+    localStorage.setItem('lastBookingState', JSON.stringify({
+      tickets,
+      subscriptionType,
+      totalPrice,
+      selectedDate
+    }));
     router.push('/payment');
   };
 
